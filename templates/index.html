@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proposal Presentation Generator | Hospitality Technologies</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-blue: #0072CE;
+      --primary-blue-hover: #005bb5;
+      --primary-dark: #0F172A;
+      --secondary-slate: #334155;
+      --accent-red: #BE123C;
+      --bg-page: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --border-color: #E2E8F0;
+      --border-focus: #94A3B8;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --success-green: #10B981;
+      --error-red: #EF4444;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.03);
+      --radius: 12px;
+      --font-montserrat: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      font-family: var(--font-inter);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    header {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary-blue), #005096);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-family: var(--font-montserrat);
+      font-size: 1.1rem;
+      box-shadow: 0 2px 4px rgba(0, 114, 206, 0.3);
+    }
+
+    .brand-title {
+      font-family: var(--font-montserrat);
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--primary-dark);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background-color: #ECFDF5;
+      color: #065F46;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      border: 1px solid #A7F3D0;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--success-green);
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+
+    main {
+      flex: 1;
+      max-width: 900px;
+      width: 100%;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .kicker {
+      font-family: var(--font-montserrat);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-red);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero h1 {
+      font-family: var(--font-montserrat);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 650px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-md);
+      padding: 2.25rem;
+    }
+
+    .flash-messages {
+      margin-bottom: 1.5rem;
+    }
+
+    .alert {
+      padding: 0.9rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .alert-error {
+      background-color: #FEF2F2;
+      border: 1px solid #FECACA;
+      color: #991B1B;
+    }
+
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .upload-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .dropzone-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .dropzone-label {
+      font-family: var(--font-montserrat);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--secondary-slate);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .badge-req {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: #EFF6FF;
+      color: var(--primary-blue);
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border-color);
+      border-radius: 10px;
+      padding: 2rem 1.25rem;
+      text-align: center;
+      background-color: #FAFAFC;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 180px;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary-blue);
+      background-color: #F0F7FF;
+      transform: translateY(-1px);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background-color: #FFFFFF;
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+      color: var(--primary-blue);
+      transition: all 0.2s;
+    }
+
+    .dropzone:hover .dropzone-icon {
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(0, 114, 206, 0.15);
+    }
+
+    .dropzone-text-primary {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    .dropzone-text-secondary {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .file-preview {
+      display: none;
+      width: 100%;
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 0.75rem;
+      text-align: left;
+      position: relative;
+      z-index: 2;
+    }
+
+    .file-preview-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .file-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 180px;
+    }
+
+    .file-size {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .btn-remove:hover {
+      color: var(--error-red);
+      background-color: #FEF2F2;
+    }
+
+    .form-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background-color: var(--primary-blue);
+      color: #FFFFFF;
+      font-family: var(--font-montserrat);
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 1rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 114, 206, 0.25);
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background-color: var(--primary-blue-hover);
+      box-shadow: 0 6px 12px -2px rgba(0, 114, 206, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #FFFFFF;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .progress-bar-container {
+      display: none;
+      width: 100%;
+      background: #E2E8F0;
+      border-radius: 9999px;
+      height: 6px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .progress-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary-blue), #38BDF8);
+      animation: indeterminate 1.5s infinite linear;
+      transform-origin: 0% 50%;
+    }
+
+    @keyframes indeterminate {
+      0% { transform: translateX(0) scaleX(0); }
+      40% { transform: translateX(0) scaleX(0.4); }
+      100% { transform: translateX(100%) scaleX(0.5); }
+    }
+
+    .info-callout {
+      background-color: #F1F5F9;
+      border-left: 4px solid var(--primary-blue);
+      border-radius: 0 8px 8px 0;
+      padding: 0.9rem 1.25rem;
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--secondary-slate);
+    }
+
+    .info-callout strong {
+      color: var(--primary-dark);
+      font-family: var(--font-montserrat);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-color);
+      background: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-icon">HT</div>
+      <div>
+        <div class="brand-title">Proposal Presentation Engine</div>
+        <div class="brand-subtitle">Hospitality Technologies Automated Deck Generation</div>
+      </div>
+    </div>
+    <div class="badge-status">
+      <span class="status-dot"></span>
+      <span>Engine Online</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="kicker">Executive Automation</div>
+      <h1>Generate Client Proposal Deck</h1>
+      <p>Upload the base presentation template along with the completed quote workbook to automatically synthesize financial tables, investment metric cards, and legal terms.</p>
+    </div>
+
+    <div class="card">
+      <div class="flash-messages" id="flash-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-error">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>{{ message }}</span>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      <form id="deckForm" action="/generate" method="POST" enctype="multipart/form-data">
+        <div class="upload-grid">
+          <!-- Base PPTX Upload -->
+          <div class="dropzone-container">
+            <div class="dropzone-label">
+              <span>Base Presentation</span>
+              <span class="badge-req">.pptx</span>
+            </div>
+            <div class="dropzone" id="pptx-dropzone">
+              <input type="file" id="base_pptx" name="base_pptx" accept=".pptx" required>
+              <div class="dropzone-content" id="pptx-content">
+                <div class="dropzone-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                </div>
+                <div class="dropzone-text-primary">Click or drag .pptx here</div>
+                <div class="dropzone-text-secondary">Template with branding & closer</div>
+              </div>
+              <div class="file-preview" id="pptx-preview">
+                <div class="file-preview-info">
+                  <div>
+                    <div class="file-name" id="pptx-name">filename.pptx</div>
+                    <div class="file-size" id="pptx-size">0 KB</div>
+                  </div>
+                  <button type="button" class="btn-remove" id="pptx-remove" title="Remove file">&times;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quote Data Excel Upload -->
+          <div class="dropzone-container">
+            <div class="dropzone-label">
+              <span>Quote Data</span>
+              <span class="badge-req">.xlsx / .xls</span>
+            </div>
+            <div class="dropzone" id="excel-dropzone">
+              <input type="file" id="quote_excel" name="quote_excel" accept=".xlsx,.xls" required>
+              <div class="dropzone-content" id="excel-content">
+                <div class="dropzone-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="8" y1="13" x2="16" y2="13"></line>
+                    <line x1="8" y1="17" x2="16" y2="17"></line>
+                    <line x1="10" y1="9" x2="8" y2="9"></line>
+                  </svg>
+                </div>
+                <div class="dropzone-text-primary">Click or drag .xlsx here</div>
+                <div class="dropzone-text-secondary">Exported quote with line items</div>
+              </div>
+              <div class="file-preview" id="excel-preview">
+                <div class="file-preview-info">
+                  <div>
+                    <div class="file-name" id="excel-name">quote.xlsx</div>
+                    <div class="file-size" id="excel-size">0 KB</div>
+                  </div>
+                  <button type="button" class="btn-remove" id="excel-remove" title="Remove file">&times;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-submit" id="btnSubmit">
+            <span class="spinner" id="spinner"></span>
+            <svg id="download-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span id="btnText">Generate Presentation</span>
+          </button>
+          <div class="progress-bar-container" id="progressBar">
+            <div class="progress-bar-fill"></div>
+          </div>
+        </div>
+      </form>
+
+      <div class="info-callout">
+        <strong>In-Memory Processing:</strong> Files are buffered and compiled strictly in-memory using <code>io.BytesIO</code>. No customer or quote data is persisted to the local server disk.
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2026 Hospitality Technologies. Enterprise Presentation Synthesis Engine.
+  </footer>
+
+  <script>
+    function setupDropzone(inputId, dropzoneId, contentId, previewId, nameId, sizeId, removeId) {
+      const input = document.getElementById(inputId);
+      const dropzone = document.getElementById(dropzoneId);
+      const content = document.getElementById(contentId);
+      const preview = document.getElementById(previewId);
+      const nameElem = document.getElementById(nameId);
+      const sizeElem = document.getElementById(sizeId);
+      const removeBtn = document.getElementById(removeId);
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      }
+
+      function updateFile(file) {
+        if (file) {
+          nameElem.textContent = file.name;
+          sizeElem.textContent = formatBytes(file.size);
+          content.style.display = 'none';
+          preview.style.display = 'block';
+        } else {
+          input.value = '';
+          content.style.display = 'flex';
+          preview.style.display = 'none';
+        }
+      }
+
+      input.addEventListener('change', () => {
+        if (input.files && input.files[0]) {
+          updateFile(input.files[0]);
+        }
+      });
+
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        updateFile(null);
+      });
+
+      ['dragenter', 'dragover'].forEach(name => {
+        dropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(name => {
+        dropzone.addEventListener(name, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+        });
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt.files && dt.files.length) {
+          input.files = dt.files;
+          updateFile(dt.files[0]);
+        }
+      });
+    }
+
+    setupDropzone('base_pptx', 'pptx-dropzone', 'pptx-content', 'pptx-preview', 'pptx-name', 'pptx-size', 'pptx-remove');
+    setupDropzone('quote_excel', 'excel-dropzone', 'excel-content', 'excel-preview', 'excel-name', 'excel-size', 'excel-remove');
+
+    const form = document.getElementById('deckForm');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const btnText = document.getElementById('btnText');
+    const spinner = document.getElementById('spinner');
+    const downloadIcon = document.getElementById('download-icon');
+    const progressBar = document.getElementById('progressBar');
+    const flashContainer = document.getElementById('flash-container');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const pptxInput = document.getElementById('base_pptx');
+      const excelInput = document.getElementById('quote_excel');
+
+      if (!pptxInput.files[0] || !excelInput.files[0]) {
+        showError("Please upload both the Base Presentation (.pptx) and Quote Data (.xlsx) files.");
+        return;
+      }
+
+      // Enter loading state
+      btnSubmit.disabled = true;
+      spinner.style.display = 'inline-block';
+      downloadIcon.style.display = 'none';
+      btnText.textContent = "Synthesizing Presentation...";
+      progressBar.style.display = 'block';
+      flashContainer.innerHTML = '';
+
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch('/generate', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.indexOf("application/json") !== -1) {
+            const errData = await response.json();
+            throw new Error(errData.error || "Generation failed on server.");
+          } else {
+            throw new Error(`Generation failed with server status ${response.status}`);
+          }
+        }
+
+        // Receive binary PPTX stream
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'Generated_Proposal.pptx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+
+        btnText.textContent = "Presentation Generated!";
+        setTimeout(() => {
+          btnText.textContent = "Generate Presentation";
+        }, 3000);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btnSubmit.disabled = false;
+        spinner.style.display = 'none';
+        downloadIcon.style.display = 'inline-block';
+        progressBar.style.display = 'none';
+      }
+    });
+
+    function showError(message) {
+      flashContainer.innerHTML = `
+        <div class="alert alert-error">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>${message}</span>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
