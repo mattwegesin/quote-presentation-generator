@@ -78,7 +78,8 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
         data.append({"type": "header"})
         subtotal = 0
         for it in s["items"]:
-            data.append({"type": "item", "desc": it["desc"], "part": it["part"], "qty": it["qty"], "price": it["total"]})
+            unit_cost = it.get("unit_cost", 0.0)
+            data.append({"type": "item", "desc": it["desc"], "part": it["part"], "qty": it["qty"], "unit_cost": unit_cost, "price": it["total"]})
             subtotal += it["total"]
         if is_monthly:
             data.append({"type": "monthly", "val": subtotal})
@@ -93,19 +94,20 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
     if rows == 0: return slide
     
     start_y = 1.1 if not is_monthly else 1.3
-    table_shape = slide.shapes.add_table(rows, 4, Inches(0.83), Inches(start_y), Inches(11.5), Inches(0.3 * rows))
+    table_shape = slide.shapes.add_table(rows, 5, Inches(0.83), Inches(start_y), Inches(11.5), Inches(0.3 * rows))
     table = table_shape.table
     
-    table.columns[0].width = Inches(5.5)
-    table.columns[1].width = Inches(3.0)
-    table.columns[2].width = Inches(1.5)
-    table.columns[3].width = Inches(1.5)
+    table.columns[0].width = Inches(4.5)
+    table.columns[1].width = Inches(2.5)
+    table.columns[2].width = Inches(1.1)
+    table.columns[3].width = Inches(1.7)
+    table.columns[4].width = Inches(1.7)
     
     for i, row in enumerate(data):
-        cells = [table.cell(i, j) for j in range(4)]
+        cells = [table.cell(i, j) for j in range(5)]
         
         if row["type"] == "section_title":
-            cells[0].merge(cells[3])
+            cells[0].merge(cells[4])
             cells[0].text = "   " + row["text"]
             cells[0].fill.solid()
             cells[0].fill.fore_color.rgb = blue_bg
@@ -117,7 +119,7 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
             p.alignment = PP_ALIGN.LEFT
             
         elif row["type"] == "header":
-            headers = ["Description", "Item", "Quantity", "Price"]
+            headers = ["Description", "Item", "Quantity", "Unit Cost", "Price"]
             for j, h in enumerate(headers):
                 cells[j].text = h
                 cells[j].fill.solid()
@@ -127,28 +129,34 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
                 p.font.size = Pt(11)
                 p.font.bold = True
                 p.font.color.rgb = slate_text
-                if j >= 2: p.alignment = PP_ALIGN.CENTER
+                if j == 2:
+                    p.alignment = PP_ALIGN.CENTER
+                elif j >= 3:
+                    p.alignment = PP_ALIGN.RIGHT
                 
         elif row["type"] == "item":
             cells[0].text = row["desc"]
             cells[1].text = row["part"]
             cells[2].text = str(row["qty"])
-            cells[3].text = f"${row['price']:,.2f}"
-            for j in range(4):
+            cells[3].text = f"${row['unit_cost']:,.2f}"
+            cells[4].text = f"${row['price']:,.2f}"
+            for j in range(5):
                 cells[j].fill.solid()
                 cells[j].fill.fore_color.rgb = RGBColor.from_string('FFFFFF') if i % 2 == 0 else light_grey_bg
                 p = cells[j].text_frame.paragraphs[0]
                 p.font.name = 'Montserrat'
                 p.font.size = Pt(10)
                 p.font.color.rgb = slate_text
-                if j == 2: p.alignment = PP_ALIGN.CENTER
-                if j == 3: p.alignment = PP_ALIGN.RIGHT
+                if j == 2:
+                    p.alignment = PP_ALIGN.CENTER
+                elif j >= 3:
+                    p.alignment = PP_ALIGN.RIGHT
                 
         elif row["type"] in ("subtotal", "monthly"):
-            cells[0].merge(cells[2])
+            cells[0].merge(cells[3])
             cells[0].text = "SUBTOTAL" if row["type"] == "subtotal" else "MONTHLY"
-            cells[3].text = f"${row['val']:,.2f}"
-            for j in (0, 3):
+            cells[4].text = f"${row['val']:,.2f}"
+            for j in (0, 4):
                 cells[j].fill.solid()
                 cells[j].fill.fore_color.rgb = RGBColor.from_string('FFFFFF')
                 p = cells[j].text_frame.paragraphs[0]
@@ -156,11 +164,10 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
                 p.font.size = Pt(12)
                 p.font.bold = True
                 p.font.color.rgb = slate_text
-                if j == 0: p.alignment = PP_ALIGN.RIGHT
-                if j == 3: p.alignment = PP_ALIGN.RIGHT
+                p.alignment = PP_ALIGN.RIGHT
                 
         elif row["type"] == "spacer":
-            cells[0].merge(cells[3])
+            cells[0].merge(cells[4])
             cells[0].text = ""
 
 def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
@@ -390,6 +397,7 @@ def generate_presentation(pptx_source, excel_source, output_target=None):
         col1 = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
         col2 = str(row.iloc[2]).strip() if pd.notna(row.iloc[2]) else ""
         col3 = row.iloc[3]
+        col4 = row.iloc[4]
         col5 = row.iloc[5]
 
         # Identify section headers
@@ -407,8 +415,17 @@ def generate_presentation(pptx_source, excel_source, output_target=None):
             if col1 and col1 != "Description" and col1 != "Spares":
                 qty = clean_float(col3)
                 total = clean_float(col5)
+                unit_cost = clean_float(col4)
+                if unit_cost == 0.0 and qty > 0 and total > 0:
+                    unit_cost = round(total / qty, 2)
                 if qty > 0:
-                    sections[-1]["items"].append({"desc": col1, "part": col2, "qty": int(qty), "total": total})
+                    sections[-1]["items"].append({
+                        "desc": col1,
+                        "part": col2,
+                        "qty": int(qty),
+                        "unit_cost": unit_cost,
+                        "total": total
+                    })
 
     sections = [s for s in sections if s["items"]]
 
