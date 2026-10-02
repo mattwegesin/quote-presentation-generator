@@ -67,7 +67,7 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
     if is_monthly:
         tb3 = slide.shapes.add_textbox(Inches(0.83), Inches(0.8), Inches(11.5), Inches(0.5))
         p3 = tb3.text_frame.paragraphs[0]
-        p3.text = "Hotel staff and guests will have 24x7x365 support from dedicated Hospitality Technologies support representatives."
+        p3.text = "24x7x365 support by dedicated Hospitality Technologies agents for guests and hotel staff"
         p3.font.name = 'Montserrat'
         p3.font.size = Pt(12)
         p3.font.color.rgb = slate_text
