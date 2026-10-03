@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 def create_cta_button_image():
     """Generates a high-quality modern CTA button as an in-memory PNG to bypass PDF hyperlink styling issues."""
-    width, height = 1000, 140
+    width, height = 1200, 140
     img = Image.new('RGBA', (width, height), color=(0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     
@@ -22,14 +22,17 @@ def create_cta_button_image():
     
     # Try to load a nice font, fallback to default if not available
     try:
-        # Works on most linux/docker environments with fonts-liberation
-        font = ImageFont.truetype("LiberationSans-Bold.ttf", 48)
+        # Absolute path for Debian/Render Docker environment
+        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 48)
     except:
         try:
             # Works on macOS
             font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 48)
         except:
-            font = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("LiberationSans-Bold.ttf", 48)
+            except:
+                font = ImageFont.load_default()
             
     text = "READY TO MOVE FORWARD? CLICK TO E-SIGN"
     # Center text
@@ -390,7 +393,8 @@ def create_acceptance_slides(prs, logo_data, property_code=None):
         tag_tb = slide2.shapes.add_textbox(Inches(0.83), Inches(6.8), Inches(3), Inches(0.4))
         tag_p = tag_tb.text_frame.paragraphs[0]
         tag_r = tag_p.add_run()
-        tag_r.text = r"{{Sig1|signature|width=150|height=50}}"
+        # BoldSign text tag syntax: {{sign|1|*}} padded with spaces to control width
+        tag_r.text = r"{{     sign|1|*     }}"
         # Make the text tag invisible (white on white)
         tag_r.font.size = Pt(8)
         tag_r.font.color.rgb = RGBColor.from_string('FFFFFF')
