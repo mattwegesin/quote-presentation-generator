@@ -175,31 +175,32 @@ def generate():
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
         if target_page:
             # The python-pptx coordinates for the physical Signature and Date lines we just drew are:
-            # Signature Line: Left=2.5", Top=6.3", End=6.5" -> Width=4.0"
-            # Date Line: Left=8.0", Top=6.3", End=11.5" -> Width=3.5"
-            # 72 DPI Conversion (PDF origin is Top-Left):
-            # Sig X = 2.5 * 72 = 180
-            # Sig Y = 6.3 * 72 = 453.6. Offset -36px up so the signature block sits perfectly on top of the line. -> Y = 418
-            # Sig Width = 4.0 * 72 = 288
-            # Date X = 8.0 * 72 = 576
-            # Date Width = 3.5 * 72 = 252
+            # Signature Line: Left=2.5", Top=6.3", Width=4.0"
+            # Date Line: Left=8.0", Top=6.3", Width=3.5"
+            # BoldSign API Coordinate System Conversion (96 DPI, Origin Top-Left):
+            # Sig X = 2.5 * 96 = 240
+            # Sig Y = 6.3 * 96 = 604.8. Offset -48px (0.5") up so the signature block sits perfectly on top of the line. -> Y = 557
+            # Sig Width = 4.0 * 96 = 384
+            # Sig Height = 48
+            # Date X = 8.0 * 96 = 768
+            # Date Width = 3.5 * 96 = 336
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
                 'Signers[0][formFields][0][pageNumber]': str(target_page),
-                'Signers[0][formFields][0][bounds][x]': '180',
-                'Signers[0][formFields][0][bounds][y]': '418',
-                'Signers[0][formFields][0][bounds][width]': '288',
-                'Signers[0][formFields][0][bounds][height]': '36',
+                'Signers[0][formFields][0][bounds][x]': '240',
+                'Signers[0][formFields][0][bounds][y]': '557',
+                'Signers[0][formFields][0][bounds][width]': '384',
+                'Signers[0][formFields][0][bounds][height]': '48',
                 'Signers[0][formFields][0][isRequired]': 'true',
                 
                 'Signers[0][formFields][1][id]': 'date_block',
                 'Signers[0][formFields][1][fieldType]': 'DateSigned',
                 'Signers[0][formFields][1][pageNumber]': str(target_page),
-                'Signers[0][formFields][1][bounds][x]': '576',
-                'Signers[0][formFields][1][bounds][y]': '418',
-                'Signers[0][formFields][1][bounds][width]': '252',
-                'Signers[0][formFields][1][bounds][height]': '36',
+                'Signers[0][formFields][1][bounds][x]': '768',
+                'Signers[0][formFields][1][bounds][y]': '557',
+                'Signers[0][formFields][1][bounds][width]': '336',
+                'Signers[0][formFields][1][bounds][height]': '48',
                 'Signers[0][formFields][1][isRequired]': 'true'
             })
 
