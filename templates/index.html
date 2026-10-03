@@ -482,9 +482,9 @@
             </div>
           </div>
           <div class="input-group" id="monday_item_group" style="display: none;">
-            <label for="monday_item_id" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Select Monday Quote</label>
+            <label for="monday_item_id" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Select Monday Project</label>
             <select id="monday_item_id" name="monday_item_id" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem; background-color: #FAFAFC;">
-              <option value="">-- Select Quote --</option>
+              <option value="">-- Select Project --</option>
             </select>
           </div>
           <div class="input-group">
@@ -696,7 +696,7 @@
 
           const items = await response.json();
           
-          mondayItemSelect.innerHTML = '<option value="">-- Select Quote --</option>';
+          mondayItemSelect.innerHTML = '<option value="">-- Select Project --</option>';
           if (items.length === 0) {
             showError("No matching quotes found in Monday.com for this Property Code.");
             mondayItemGroup.style.display = 'none';

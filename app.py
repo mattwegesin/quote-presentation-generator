@@ -293,6 +293,10 @@ def get_monday_quotes():
         items {
           id
           name
+          column_values {
+            column { title }
+            text
+          }
         }
       }
     }
@@ -319,8 +323,31 @@ def get_monday_quotes():
             logger.error(f"Monday API Error: {data['errors']}")
             return jsonify({"error": "Error querying Monday.com. Check server logs."}), 500
             
-        items = data.get("data", {}).get("items_page_by_column_values", {}).get("items", [])
-        return jsonify(items)
+        raw_items = data.get("data", {}).get("items_page_by_column_values", {}).get("items", [])
+        
+        formatted_items = []
+        for item in raw_items:
+            item_name = item.get("name", "")
+            quote_type = "N/A"
+            sales_owner = "N/A"
+            item_date = "N/A"
+            
+            for col in item.get("column_values", []):
+                title = col.get("column", {}).get("title", "")
+                text = col.get("text") or ""
+                
+                title_lower = title.lower()
+                if "quote type" in title_lower or title_lower == "type":
+                    if text: quote_type = text
+                elif "sales owner" in title_lower or title_lower == "owner":
+                    if text: sales_owner = text
+                elif "date" in title_lower and "update" not in title_lower:
+                    if text: item_date = text
+            
+            display_name = f"{item_name} | {quote_type} | {sales_owner} | {item_date}"
+            formatted_items.append({"id": item["id"], "name": display_name})
+
+        return jsonify(formatted_items)
         
     except Exception as e:
         logger.error(f"Failed to query Monday.com: {e}")
