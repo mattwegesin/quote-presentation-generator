@@ -176,26 +176,28 @@ def generate():
         if target_page:
             # The slide is 10.0" wide by 7.5" high in the final PDF.
             # At 96 DPI for BoldSign, the canvas is 960px by 720px.
-            # The text box is horizontally centered at Y = 6.2" (595px).
-            # The text is "Signature: ______________________      Date: ____________"
-            # We offset Y slightly so the interactive blocks sit directly on top of the text underlines.
+            # The text box is horizontally placed exactly at X = 2.5" (180px in PDF space).
+            # The text box is vertically placed exactly at Y = 6.2" (595px in PDF space).
+            # The exact pixel widths of the text string at 14pt Helvetica were mathematically measured:
+            # Signature block starts exactly 69px after X=180 -> X=249.
+            # Date block starts exactly 367px after X=180 -> X=547.
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
                 'Signers[0][formFields][0][pageNumber]': str(target_page),
-                'Signers[0][formFields][0][bounds][x]': '250',
-                'Signers[0][formFields][0][bounds][y]': '570',
-                'Signers[0][formFields][0][bounds][width]': '200',
-                'Signers[0][formFields][0][bounds][height]': '36',
+                'Signers[0][formFields][0][bounds][x]': '249',
+                'Signers[0][formFields][0][bounds][y]': '588',
+                'Signers[0][formFields][0][bounds][width]': '150',
+                'Signers[0][formFields][0][bounds][height]': '30',
                 'Signers[0][formFields][0][isRequired]': 'true',
                 
                 'Signers[0][formFields][1][id]': 'date_block',
                 'Signers[0][formFields][1][fieldType]': 'DateSigned',
                 'Signers[0][formFields][1][pageNumber]': str(target_page),
-                'Signers[0][formFields][1][bounds][x]': '620',
-                'Signers[0][formFields][1][bounds][y]': '570',
-                'Signers[0][formFields][1][bounds][width]': '160',
-                'Signers[0][formFields][1][bounds][height]': '36',
+                'Signers[0][formFields][1][bounds][x]': '547',
+                'Signers[0][formFields][1][bounds][y]': '588',
+                'Signers[0][formFields][1][bounds][width]': '120',
+                'Signers[0][formFields][1][bounds][height]': '30',
                 'Signers[0][formFields][1][isRequired]': 'true'
             })
 
