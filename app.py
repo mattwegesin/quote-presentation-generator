@@ -178,29 +178,26 @@ def generate():
             # Signature Box: Left=4.166", Top=6.0", Width=2.5", Height=0.5"
             # Date Box: Left=6.666", Top=6.0", Width=2.5", Height=0.5"
             # 72 DPI Conversion:
-            # Sig X = 4.166 * 72 = 300
-            # Sig Y = 6.0 * 72 = 432
-            # Sig Width = 2.5 * 72 = 180
-            # Sig Height = 0.5 * 72 = 36
-            # Date X = 6.666 * 72 = 480
-            # Date Y = 432
+            # Sig Box X = 4.166 * 72 = 300. Offset +75px for "Signature: " text.
+            # Sig Box Y = 6.0 * 72 = 432. Offset +5px for vertical text centering.
+            # Date Box X = 6.666 * 72 = 480. Offset +45px for "Date: " text.
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
                 'Signers[0][formFields][0][pageNumber]': str(target_page),
-                'Signers[0][formFields][0][bounds][x]': '300',
-                'Signers[0][formFields][0][bounds][y]': '432',
-                'Signers[0][formFields][0][bounds][width]': '180',
-                'Signers[0][formFields][0][bounds][height]': '36',
+                'Signers[0][formFields][0][bounds][x]': '375',
+                'Signers[0][formFields][0][bounds][y]': '437',
+                'Signers[0][formFields][0][bounds][width]': '105',
+                'Signers[0][formFields][0][bounds][height]': '25',
                 'Signers[0][formFields][0][isRequired]': 'true',
                 
                 'Signers[0][formFields][1][id]': 'date_block',
                 'Signers[0][formFields][1][fieldType]': 'DateSigned',
                 'Signers[0][formFields][1][pageNumber]': str(target_page),
-                'Signers[0][formFields][1][bounds][x]': '480',
-                'Signers[0][formFields][1][bounds][y]': '432',
-                'Signers[0][formFields][1][bounds][width]': '180',
-                'Signers[0][formFields][1][bounds][height]': '36',
+                'Signers[0][formFields][1][bounds][x]': '525',
+                'Signers[0][formFields][1][bounds][y]': '437',
+                'Signers[0][formFields][1][bounds][width]': '135',
+                'Signers[0][formFields][1][bounds][height]': '25',
                 'Signers[0][formFields][1][isRequired]': 'true'
             })
 
