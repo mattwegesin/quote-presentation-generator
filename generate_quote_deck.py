@@ -383,20 +383,34 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         button_top = Inches(6.0)
 
         if for_boldsign:
-            # Draw separate text boxes for exact coordinate alignment in the BoldSign API
-            def add_label(x, y, w, text):
-                tb = slide2.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(0.5))
-                p = tb.text_frame.paragraphs[0]
-                r = p.add_run()
-                r.text = text
-                r.font.name = 'Montserrat'
-                r.font.size = Pt(14)
-                r.font.color.rgb = slate_text
-
-            add_label(3.0, 6.0, 1.0, "Signature:")
-            add_label(4.0, 6.0, 3.0, "_________________________")
-            add_label(7.3, 6.0, 0.7, "Date:")
-            add_label(8.0, 6.0, 2.0, "________________")
+            from pptx.enum.shapes import MSO_CONNECTOR
+            # Draw separate text boxes and absolute physical lines to mathematically guarantee BoldSign API alignment
+            
+            # 1. Signature Label
+            sig_tb = slide2.shapes.add_textbox(Inches(1.5), Inches(6.0), Inches(1.5), Inches(0.5))
+            p_sig = sig_tb.text_frame.paragraphs[0]
+            p_sig.text = "Signature:"
+            p_sig.font.name = 'Montserrat'
+            p_sig.font.size = Pt(14)
+            p_sig.font.color.rgb = slate_text
+            
+            # 2. Physical Signature Line (Starts exactly at 2.5", ends at 6.5")
+            sig_line = slide2.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(2.5), Inches(6.3), Inches(6.5), Inches(6.3))
+            sig_line.line.color.rgb = slate_text
+            sig_line.line.width = Pt(1.0)
+            
+            # 3. Date Label
+            date_tb = slide2.shapes.add_textbox(Inches(7.2), Inches(6.0), Inches(1.0), Inches(0.5))
+            p_date = date_tb.text_frame.paragraphs[0]
+            p_date.text = "Date:"
+            p_date.font.name = 'Montserrat'
+            p_date.font.size = Pt(14)
+            p_date.font.color.rgb = slate_text
+            
+            # 4. Physical Date Line (Starts exactly at 8.0", ends at 11.5")
+            date_line = slide2.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(8.0), Inches(6.3), Inches(11.5), Inches(6.3))
+            date_line.line.color.rgb = slate_text
+            date_line.line.width = Pt(1.0)
         else:
             # 1. Add the modern CTA Button Image
             btn_image_stream = create_cta_button_image()

@@ -174,22 +174,22 @@ def generate():
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
         if target_page:
-            # The python-pptx coordinates for the Signature and Date underlines we just drew are:
-            # Signature Underline: Left=4.0", Top=6.0", Width=3.0", Height=0.5"
-            # Date Underline: Left=8.0", Top=6.0", Width=2.0", Height=0.5"
+            # The python-pptx coordinates for the physical Signature and Date lines we just drew are:
+            # Signature Line: Left=2.5", Top=6.3", End=6.5" -> Width=4.0"
+            # Date Line: Left=8.0", Top=6.3", End=11.5" -> Width=3.5"
             # 72 DPI Conversion (PDF origin is Top-Left):
-            # Sig X = 4.0 * 72 = 288
-            # Sig Y = 6.0 * 72 = 432. Offset +10px down so the text floats perfectly above the line.
-            # Sig Width = 3.0 * 72 = 216
+            # Sig X = 2.5 * 72 = 180
+            # Sig Y = 6.3 * 72 = 453.6. Offset -36px up so the signature block sits perfectly on top of the line. -> Y = 418
+            # Sig Width = 4.0 * 72 = 288
             # Date X = 8.0 * 72 = 576
-            # Date Width = 2.0 * 72 = 144
+            # Date Width = 3.5 * 72 = 252
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
                 'Signers[0][formFields][0][pageNumber]': str(target_page),
-                'Signers[0][formFields][0][bounds][x]': '288',
-                'Signers[0][formFields][0][bounds][y]': '442',
-                'Signers[0][formFields][0][bounds][width]': '216',
+                'Signers[0][formFields][0][bounds][x]': '180',
+                'Signers[0][formFields][0][bounds][y]': '418',
+                'Signers[0][formFields][0][bounds][width]': '288',
                 'Signers[0][formFields][0][bounds][height]': '36',
                 'Signers[0][formFields][0][isRequired]': 'true',
                 
@@ -197,8 +197,8 @@ def generate():
                 'Signers[0][formFields][1][fieldType]': 'DateSigned',
                 'Signers[0][formFields][1][pageNumber]': str(target_page),
                 'Signers[0][formFields][1][bounds][x]': '576',
-                'Signers[0][formFields][1][bounds][y]': '442',
-                'Signers[0][formFields][1][bounds][width]': '144',
+                'Signers[0][formFields][1][bounds][y]': '418',
+                'Signers[0][formFields][1][bounds][width]': '252',
                 'Signers[0][formFields][1][bounds][height]': '36',
                 'Signers[0][formFields][1][isRequired]': 'true'
             })
