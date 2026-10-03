@@ -288,7 +288,7 @@ def get_monday_quotes():
     board_id = "18424851511"
     
     query = """
-    query ($boardId: [ID!], $propCode: [String!]) {
+    query ($boardId: ID!, $propCode: [String!]) {
       items_page_by_column_values(limit: 50, board_id: $boardId, columns: [{column_id: "name", column_values: $propCode}]) {
         items {
           id
@@ -308,7 +308,7 @@ def get_monday_quotes():
         resp = requests.post("https://api.monday.com/v2", headers=headers, json={
             "query": query,
             "variables": {
-                "boardId": [board_id],
+                "boardId": board_id,
                 "propCode": [property_code]
             }
         })
