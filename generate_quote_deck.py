@@ -383,22 +383,15 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         button_top = Inches(6.0)
 
         if for_boldsign:
-            # Draw Signature and Date fields instead of a button
-            sig_tb = slide2.shapes.add_textbox(Inches(4.166), Inches(6.0), Inches(2.5), Inches(0.5))
+            # Draw Signature and Date fields as a single, wide string so it never wraps.
+            sig_tb = slide2.shapes.add_textbox(Inches(1.666), Inches(6.2), Inches(10.0), Inches(0.5))
             p_sig = sig_tb.text_frame.paragraphs[0]
             r_sig = p_sig.add_run()
-            r_sig.text = "Signature: __________________________"
+            r_sig.text = "Signature: _____________________________________             Date: _________________________"
             r_sig.font.name = 'Montserrat'
             r_sig.font.size = Pt(14)
             r_sig.font.color.rgb = slate_text
-            
-            date_tb = slide2.shapes.add_textbox(Inches(6.666), Inches(6.0), Inches(2.5), Inches(0.5))
-            p_date = date_tb.text_frame.paragraphs[0]
-            r_date = p_date.add_run()
-            r_date.text = "Date: _____________________"
-            r_date.font.name = 'Montserrat'
-            r_date.font.size = Pt(14)
-            r_date.font.color.rgb = slate_text
+            p_sig.alignment = PP_ALIGN.CENTER
         else:
             # 1. Add the modern CTA Button Image
             btn_image_stream = create_cta_button_image()
