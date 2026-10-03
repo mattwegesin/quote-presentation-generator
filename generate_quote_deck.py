@@ -383,22 +383,20 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         button_top = Inches(6.0)
 
         if for_boldsign:
-            # Draw Signature and Date fields instead of a button
-            sig_tb = slide2.shapes.add_textbox(Inches(4.166), Inches(6.0), Inches(2.5), Inches(0.5))
-            p_sig = sig_tb.text_frame.paragraphs[0]
-            r_sig = p_sig.add_run()
-            r_sig.text = "Signature: __________________________"
-            r_sig.font.name = 'Montserrat'
-            r_sig.font.size = Pt(14)
-            r_sig.font.color.rgb = slate_text
+            # Draw separate text boxes for exact coordinate alignment in the BoldSign API
+            def add_label(x, y, w, text):
+                tb = slide2.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(0.5))
+                p = tb.text_frame.paragraphs[0]
+                r = p.add_run()
+                r.text = text
+                r.font.name = 'Montserrat'
+                r.font.size = Pt(14)
+                r.font.color.rgb = slate_text
 
-            date_tb = slide2.shapes.add_textbox(Inches(6.666), Inches(6.0), Inches(2.5), Inches(0.5))
-            p_date = date_tb.text_frame.paragraphs[0]
-            r_date = p_date.add_run()
-            r_date.text = "Date: _____________________"
-            r_date.font.name = 'Montserrat'
-            r_date.font.size = Pt(14)
-            r_date.font.color.rgb = slate_text
+            add_label(3.0, 6.0, 1.0, "Signature:")
+            add_label(4.0, 6.0, 3.0, "_________________________")
+            add_label(7.3, 6.0, 0.7, "Date:")
+            add_label(8.0, 6.0, 2.0, "________________")
         else:
             # 1. Add the modern CTA Button Image
             btn_image_stream = create_cta_button_image()
