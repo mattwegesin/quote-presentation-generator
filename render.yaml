@@ -5,3 +5,5 @@ services:
     envVars:
       - key: FLASK_SECRET_KEY
         generateValue: true
+      - key: BOLDSIGN_API_KEY
+        sync: false
