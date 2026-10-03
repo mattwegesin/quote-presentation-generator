@@ -329,18 +329,131 @@ def get_monday_quotes():
 @app.route("/api/boldsign-webhook", methods=["POST"])
 def boldsign_webhook():
     """Receives completion events from BoldSign to sync with Monday.com and SharePoint."""
-    # Since this is an MVP demonstration, we will acknowledge the webhook and log the event.
-    # In a full production setup, this would execute the Monday.com GraphQL mutations 
-    # and Microsoft Graph API PUT requests as detailed in the architecture spec.
     try:
+        import base64
         event = request.json
-        if event and event.get("event") == "DocumentCompleted":
+        if not event:
+            return jsonify({"status": "ignored"}), 200
+
+        event_type = event.get("event")
+        if event_type == "DocumentCompleted":
             doc_id = event.get("document", {}).get("documentId")
             logger.info(f"Webhook Received: DocumentCompleted for {doc_id}")
-            # Placeholder for Monday.com Sync
-            # Placeholder for MS Graph Archival
-            return jsonify({"status": "acknowledged", "sync": "pending"}), 200
-            
+
+            # 1. Fetch BoldSign CustomField to get MondayItemId
+            bs_api_key = os.environ.get("BOLDSIGN_API_KEY")
+            bs_headers = {'X-API-KEY': bs_api_key, 'Accept': 'application/json'}
+            prop_resp = requests.get(f"https://api.boldsign.com/v1/document/properties?documentId={doc_id}", headers=bs_headers)
+            prop_resp.raise_for_status()
+
+            custom_field_str = prop_resp.json().get("customField", "")
+            custom_fields = dict(item.split("=") for item in custom_field_str.split(";") if "=" in item)
+            monday_item_id = custom_fields.get("MondayItemId")
+
+            if not monday_item_id:
+                logger.error("No MondayItemId found in BoldSign CustomField")
+                return jsonify({"status": "error", "message": "Missing MondayItemId"}), 400
+
+            # 2. Update Monday.com Status and Extract SharePoint Link
+            monday_token = os.environ.get("MONDAY_API_TOKEN")
+            board_id = "18424851511"
+            monday_headers = {
+                "Authorization": monday_token, 
+                "API-Version": "2024-01", 
+                "Content-Type": "application/json"
+            }
+
+            # Update Status to WON
+            mutation = """
+            mutation ($itemId: ID!, $boardId: ID!) {
+              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "status", value: "{\\"label\\":\\"WON\\"}") {
+                id
+              }
+            }
+            """
+            requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                "query": mutation,
+                "variables": {"itemId": monday_item_id, "boardId": board_id}
+            })
+
+            # Fetch the Files (SharePoint) link
+            query = """
+            query ($itemId: [ID!]) {
+              items(ids: $itemId) {
+                column_values {
+                  column { title }
+                  text
+                  value
+                }
+              }
+            }
+            """
+            item_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                "query": query,
+                "variables": {"itemId": [monday_item_id]}
+            })
+            item_data = item_resp.json()
+
+            sp_link = None
+            for col in item_data.get("data", {}).get("items", [])[0].get("column_values", []):
+                if col.get("column", {}).get("title") == "Files":
+                    # Parse link from text or raw JSON value
+                    import json as sys_json
+                    sp_link = col.get("text")
+                    if not sp_link and col.get("value"):
+                        sp_link = sys_json.loads(col.get("value")).get("url")
+                    break
+
+            if not sp_link:
+                logger.warning(f"Could not extract SharePoint link from Monday.com item {monday_item_id}")
+                return jsonify({"status": "partial", "message": "Updated Monday but missing SP link"}), 200
+
+            # 3. Download signed PDF from BoldSign
+            dl_resp = requests.get(f"https://api.boldsign.com/v1/document/download?documentId={doc_id}", headers=bs_headers)
+            dl_resp.raise_for_status()
+            pdf_bytes = dl_resp.content
+
+            # 4. Upload to SharePoint via MS Graph API
+            tenant_id = os.environ.get("MS_GRAPH_TENANT_ID")
+            client_id = os.environ.get("MS_GRAPH_CLIENT_ID")
+            client_secret = os.environ.get("MS_GRAPH_CLIENT_SECRET")
+
+            if not all([tenant_id, client_id, client_secret]):
+                logger.error("Missing MS Graph credentials in environment variables")
+                return jsonify({"status": "partial", "message": "Missing MS Graph credentials"}), 200
+
+            token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+            token_resp = requests.post(token_url, data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "scope": "https://graph.microsoft.com/.default"
+            })
+            token_resp.raise_for_status()
+            ms_token = token_resp.json().get("access_token")
+
+            # Convert SharePoint web URL to Graph API Sharing URL
+            encoded_url = base64.b64encode(sp_link.encode("utf-8")).decode("utf-8")
+            encoded_url = "u!" + encoded_url.rstrip("=").replace("/", "_").replace("+", "-")
+
+            folder_url = f"https://graph.microsoft.com/v1.0/shares/{encoded_url}/driveItem"
+            ms_headers = {"Authorization": f"Bearer {ms_token}"}
+            folder_resp = requests.get(folder_url, headers=ms_headers)
+            folder_resp.raise_for_status()
+
+            folder_info = folder_resp.json()
+            drive_id = folder_info.get("parentReference", {}).get("driveId")
+            item_id = folder_info.get("id")
+
+            # Upload the file
+            file_name = f"Signed_Agreement_{doc_id[:8]}.pdf"
+            upload_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}:/{file_name}:/content"
+            upload_resp = requests.put(upload_url, headers={"Authorization": f"Bearer {ms_token}", "Content-Type": "application/pdf"}, data=pdf_bytes)
+            upload_resp.raise_for_status()
+
+            logger.info("Successfully updated Monday.com status and uploaded PDF to SharePoint.")
+            return jsonify({"status": "success", "message": "Pipeline completed"}), 200
+
         return jsonify({"status": "ignored"}), 200
     except Exception as e:
         logger.error(f"Webhook processing error: {e}")
