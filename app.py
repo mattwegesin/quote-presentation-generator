@@ -398,10 +398,19 @@ def boldsign_webhook():
               }
             }
             """
-            requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+            mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
                 "query": mutation,
                 "variables": {"itemId": monday_item_id, "boardId": board_id}
             })
+            
+            try:
+                mut_data = mut_resp.json()
+                if "errors" in mut_data:
+                    logger.error(f"Monday Mutation Error: {mut_data['errors']}")
+                else:
+                    logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
+            except Exception as e:
+                logger.error(f"Failed to parse Monday mutation response: {e}")
 
             # Fetch the Files (SharePoint) link
             query = """
