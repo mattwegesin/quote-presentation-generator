@@ -692,12 +692,12 @@
           }
         }
 
-        // Receive binary PPTX stream
+        // Receive binary PPTX/PDF stream
         const blob = await response.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = 'Generated_Proposal.pptx';
+        a.download = 'Generated_Proposal.pdf';
         document.body.appendChild(a);
         a.click();
         a.remove();

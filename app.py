@@ -3,6 +3,8 @@ import io
 import json
 import logging
 import requests
+import tempfile
+import subprocess
 from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
 from generate_quote_deck import generate_presentation
@@ -28,6 +30,35 @@ def has_allowed_extension(filename, allowed_extensions):
         return False
     _, ext = os.path.splitext(filename)
     return ext.lower() in allowed_extensions
+
+def convert_pptx_to_pdf(pptx_stream):
+    """Converts a PPTX BytesIO stream to a PDF BytesIO stream using headless LibreOffice."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_path = os.path.join(temp_dir, "input.pptx")
+        with open(input_path, "wb") as f:
+            f.write(pptx_stream.read())
+            
+        logger.info("Running LibreOffice headless conversion to PDF...")
+        # Note: In a Docker container running LibreOffice, this command converts the file
+        cmd = [
+            "libreoffice", "--headless", "--convert-to", "pdf",
+            "--outdir", temp_dir, input_path
+        ]
+        
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"LibreOffice conversion failed: {e.stderr.decode('utf-8', errors='ignore')}")
+            raise RuntimeError("PDF conversion failed.")
+            
+        output_path = os.path.join(temp_dir, "input.pdf")
+        if not os.path.exists(output_path):
+            raise FileNotFoundError("PDF file was not created by LibreOffice.")
+            
+        with open(output_path, "rb") as f:
+            pdf_data = f.read()
+            
+    return io.BytesIO(pdf_data)
 
 @app.route("/", methods=["GET"])
 def index():
@@ -100,12 +131,16 @@ def generate():
 
         # Generate the compiled presentation in-memory
         output_stream = generate_presentation(pptx_stream, excel_stream, property_code=property_code)
+        
+        # Convert PPTX to PDF
+        output_stream.seek(0)
+        pdf_stream = convert_pptx_to_pdf(output_stream)
 
         # Send to BoldSign
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
         if boldsign_api_key:
             logger.info(f"Sending document to BoldSign for {property_code}")
-            output_stream.seek(0)
+            pdf_stream.seek(0)
             
             headers = {
                 'X-API-KEY': boldsign_api_key,
@@ -113,7 +148,7 @@ def generate():
             }
             
             files = {
-                'Files': ('Generated_Proposal.pptx', output_stream.read(), 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+                'Files': ('Generated_Proposal.pdf', pdf_stream.read(), 'application/pdf')
             }
             
             # Simple signature block placement. In production, we'd add precise bounding boxes.
@@ -137,15 +172,15 @@ def generate():
             else:
                 logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
             
-            output_stream.seek(0)
+            pdf_stream.seek(0)
 
-        logger.info("Successfully compiled proposal deck. Streaming 'Generated_Proposal.pptx' to client.")
+        logger.info("Successfully compiled proposal deck. Streaming 'Generated_Proposal.pdf' to client.")
 
         return send_file(
-            output_stream,
-            mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            pdf_stream,
+            mimetype="application/pdf",
             as_attachment=True,
-            download_name="Generated_Proposal.pptx"
+            download_name="Generated_Proposal.pdf"
         )
 
     except Exception as exc:

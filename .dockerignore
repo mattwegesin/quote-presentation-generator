@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+ENV/
+env/
+.DS_Store
+*.pptx
+*.xlsx
+*.xls
+*.pdf
