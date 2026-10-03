@@ -151,24 +151,21 @@ def generate():
                 'Files': ('Generated_Proposal.pdf', pdf_stream.read(), 'application/pdf')
             }
             
-            # Simple signature block placement. In production, we'd add precise bounding boxes.
-            signers = [{
-                "name": signer_name,
-                "emailAddress": signer_email,
-                "signerType": "Signer"
-            }]
-            
             data = {
                 'Title': f"Hospitality Technologies Agreement - {property_code}",
                 'DisableEmails': 'true',
                 'ExpiryDays': '14',
-                'Signers': json.dumps(signers),
+                'UseTextTags': 'true',
+                'Signers[0][name]': signer_name,
+                'Signers[0][emailAddress]': signer_email,
+                'Signers[0][signerType]': 'Signer',
                 'CustomField': f"PropertyCode={property_code}"
             }
             
             resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
             if resp.status_code not in (200, 201):
                 logger.error(f"BoldSign API Error: {resp.status_code} - {resp.text}")
+                raise RuntimeError(f"Failed to create BoldSign document: {resp.text}")
             else:
                 logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
             
