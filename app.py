@@ -225,7 +225,10 @@ def sign_document(property_code):
         return "No active document found for signing. It may have expired.", 404
         
     document_id = target_doc.get("documentId")
-    signer_email = target_doc.get("signers")[0].get("signerEmail")
+    try:
+        signer_email = target_doc.get("signerDetails")[0].get("signerEmail")
+    except (TypeError, IndexError, KeyError):
+        return "Signer details could not be parsed from BoldSign.", 500
     
     # Get Embedded Sign Link
     link_url = f"https://api.boldsign.com/v1/document/getEmbeddedSignLink?documentId={document_id}&signerEmail={signer_email}"

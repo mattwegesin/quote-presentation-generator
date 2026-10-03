@@ -10,7 +10,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 def create_cta_button_image():
     """Generates a high-quality modern CTA button as an in-memory PNG to bypass PDF hyperlink styling issues."""
-    width, height = 1200, 140
+    # 1200x168 matches the 5.0" x 0.7" aspect ratio perfectly to prevent PowerPoint clipping
+    width, height = 1200, 168
     img = Image.new('RGBA', (width, height), color=(0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     
@@ -375,29 +376,30 @@ def create_acceptance_slides(prs, logo_data, property_code=None):
     add_p(tf2, "* Monthly Lease Price is contingent on approved financing.", bold=True)
 
     if property_code:
-        # Add a centered, modern CTA Button on slide 2 using a rendered image
         button_width = Inches(5.0)
         button_height = Inches(0.7)
         # Center horizontally: (13.333 - 5.0) / 2 = 4.166
         button_left = Inches(4.166)
         button_top = Inches(6.0)
+
+        # 1. Inject BoldSign text tag FIRST so it sits on the bottom Z-layer (behind the button)
+        tag_tb = slide2.shapes.add_textbox(button_left, button_top, button_width, button_height)
+        tag_p = tag_tb.text_frame.paragraphs[0]
+        tag_r = tag_p.add_run()
+        # Valid BoldSign text tag syntax padded to establish field width
+        tag_r.text = r"{{     sign|1|*     }}"
+        # Make the text a normal color so LibreOffice's PDF optimizer doesn't delete it
+        tag_r.font.size = Pt(12)
+        tag_r.font.color.rgb = slate_text
+        tag_p.alignment = PP_ALIGN.CENTER
         
+        # 2. Add the modern CTA Button Image OVER the text tag to hide it
         btn_image_stream = create_cta_button_image()
         cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
         
+        # 3. Apply hyperlink directly to the image object
         link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
-        # Apply hyperlink directly to the image object. LibreOffice perfectly preserves image hyperlinks in PDFs.
         cta_pic.click_action.hyperlink.address = link_url
-
-        # Inject hidden BoldSign text tag for automatic signature placement
-        tag_tb = slide2.shapes.add_textbox(Inches(0.83), Inches(6.8), Inches(3), Inches(0.4))
-        tag_p = tag_tb.text_frame.paragraphs[0]
-        tag_r = tag_p.add_run()
-        # BoldSign text tag syntax: {{sign|1|*}} padded with spaces to control width
-        tag_r.text = r"{{     sign|1|*     }}"
-        # Make the text tag invisible (white on white)
-        tag_r.font.size = Pt(8)
-        tag_r.font.color.rgb = RGBColor.from_string('FFFFFF')
 
 def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None):
     """
