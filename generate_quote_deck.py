@@ -514,19 +514,21 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
     if orig_last_idx >= 0 and len(prs.slides) > 1:
         move_slide(prs, orig_last_idx, len(prs.slides) - 1)
 
+    target_page = len(prs.slides) - 1 if property_code else None
+
     if output_target is None:
         out_stream = io.BytesIO()
         prs.save(out_stream)
         out_stream.seek(0)
-        return out_stream
+        return out_stream, target_page
     elif isinstance(output_target, (str, bytes, os.PathLike)):
         prs.save(output_target)
-        return output_target
+        return output_target, target_page
     else:
         prs.save(output_target)
         if hasattr(output_target, 'seek'):
             output_target.seek(0)
-        return output_target
+        return output_target, target_page
 
 def main(pptx_path=None, excel_path=None, output_filename=None):
     if pptx_path is None:
