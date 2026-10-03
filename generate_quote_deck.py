@@ -339,17 +339,28 @@ def create_acceptance_slides(prs, logo_data, property_code=None):
     add_p(tf2, "* Monthly Lease Price is contingent on approved financing.", bold=True)
 
     if property_code:
-        # Add a CTA link on slide 2
-        tb_cta = slide2.shapes.add_textbox(Inches(0.83), Inches(5.8), Inches(10), Inches(0.5))
-        p_cta = tb_cta.text_frame.paragraphs[0]
+        # Add a styled CTA Button on slide 2
+        cta_shape = slide2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.83), Inches(5.5), Inches(5.5), Inches(0.6))
+        cta_shape.fill.solid()
+        cta_shape.fill.fore_color.rgb = RGBColor.from_string('0072CE')
+        cta_shape.line.color.rgb = RGBColor.from_string('0072CE')
+        
+        tf_cta = cta_shape.text_frame
+        p_cta = tf_cta.paragraphs[0]
+        p_cta.alignment = PP_ALIGN.CENTER
+        
         r_cta = p_cta.add_run()
         r_cta.text = "Ready to move forward? Click here to electronically sign."
-        hlink = r_cta.hyperlink
-        hlink.address = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
         r_cta.font.name = 'Montserrat'
-        r_cta.font.size = Pt(14)
+        r_cta.font.size = Pt(12)
         r_cta.font.bold = True
-        r_cta.font.color.rgb = RGBColor.from_string('0072CE')
+        r_cta.font.color.rgb = RGBColor.from_string('FFFFFF')
+        
+        link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
+        # Apply hyperlink to text so it survives most PDF exports
+        r_cta.hyperlink.address = link_url
+        # Apply hyperlink to shape click action for PPTX presentation mode
+        cta_shape.click_action.hyperlink.address = link_url
 
 def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None):
     """
