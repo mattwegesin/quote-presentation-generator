@@ -476,7 +476,16 @@
         <div class="input-list" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
           <div class="input-group">
             <label for="property_code" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Property / INN Code</label>
-            <input type="text" id="property_code" name="property_code" required placeholder="e.g. ABCTX" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="text" id="property_code" name="property_code" required placeholder="e.g. ABCTX" style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
+              <button type="button" id="btnLookup" style="background-color: var(--secondary-slate); color: white; padding: 0 1rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Lookup Quotes</button>
+            </div>
+          </div>
+          <div class="input-group" id="monday_item_group" style="display: none;">
+            <label for="monday_item_id" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Select Monday Quote</label>
+            <select id="monday_item_id" name="monday_item_id" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem; background-color: #FAFAFC;">
+              <option value="">-- Select Quote --</option>
+            </select>
           </div>
           <div class="input-group">
             <label for="signer_name" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Signer Name</label>
@@ -655,6 +664,61 @@
     const downloadIcon = document.getElementById('download-icon');
     const progressBar = document.getElementById('progressBar');
     const flashContainer = document.getElementById('flash-container');
+
+    const btnLookup = document.getElementById('btnLookup');
+    const mondayItemGroup = document.getElementById('monday_item_group');
+    const mondayItemSelect = document.getElementById('monday_item_id');
+
+    if (btnLookup) {
+      btnLookup.addEventListener('click', async () => {
+        const propertyCode = document.getElementById('property_code').value.trim();
+        if (!propertyCode) {
+          showError("Please enter a Property / INN Code first.");
+          return;
+        }
+        
+        btnLookup.textContent = "Loading...";
+        btnLookup.disabled = true;
+
+        try {
+          const formData = new FormData();
+          formData.append('property_code', propertyCode);
+          
+          const response = await fetch('/api/get_monday_quotes', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || "Failed to lookup quotes");
+          }
+
+          const items = await response.json();
+          
+          mondayItemSelect.innerHTML = '<option value="">-- Select Quote --</option>';
+          if (items.length === 0) {
+            showError("No matching quotes found in Monday.com for this Property Code.");
+            mondayItemGroup.style.display = 'none';
+          } else {
+            items.forEach(item => {
+              const option = document.createElement('option');
+              option.value = item.id;
+              option.textContent = item.name;
+              mondayItemSelect.appendChild(option);
+            });
+            mondayItemGroup.style.display = 'block';
+            flashContainer.innerHTML = ''; // clear any previous errors
+          }
+        } catch (err) {
+          showError(err.message);
+          mondayItemGroup.style.display = 'none';
+        } finally {
+          btnLookup.textContent = "Lookup Quotes";
+          btnLookup.disabled = false;
+        }
+      });
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

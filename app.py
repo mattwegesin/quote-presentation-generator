@@ -114,6 +114,7 @@ def generate():
 
     try:
         property_code = request.form.get("property_code", "").strip()
+        monday_item_id = request.form.get("monday_item_id", "").strip()
         signer_name = request.form.get("signer_name", "").strip()
         signer_email = request.form.get("signer_email", "").strip()
         
@@ -162,6 +163,10 @@ def generate():
             'Files': ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf')
         }
 
+        custom_field = f"PropertyCode={property_code}"
+        if monday_item_id:
+            custom_field += f";MondayItemId={monday_item_id}"
+
         data = {
             'Title': f"Hospitality Technologies Agreement - {property_code}",
             'DisableEmails': 'true',
@@ -169,7 +174,7 @@ def generate():
             'Signers[0][name]': signer_name,
             'Signers[0][emailAddress]': signer_email,
             'Signers[0][signerType]': 'Signer',
-            'CustomField': f"PropertyCode={property_code}"
+            'CustomField': custom_field
         }
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
@@ -269,6 +274,57 @@ def sign_document(property_code):
         return redirect(sign_link)
     
     return "Error generating signature link.", 500
+
+@app.route("/api/get_monday_quotes", methods=["POST"])
+def get_monday_quotes():
+    property_code = request.form.get("property_code", "").strip()
+    if not property_code:
+        return jsonify({"error": "Property code required"}), 400
+        
+    monday_token = os.environ.get("MONDAY_API_TOKEN")
+    if not monday_token:
+        return jsonify({"error": "Monday API token not configured on server"}), 500
+        
+    board_id = "18424851511"
+    
+    query = """
+    query ($boardId: [ID!], $propCode: [String!]) {
+      items_page_by_column_values(limit: 50, board_id: $boardId, columns: [{column_id: "name", column_values: $propCode}]) {
+        items {
+          id
+          name
+        }
+      }
+    }
+    """
+    
+    headers = {
+        "Authorization": monday_token,
+        "API-Version": "2024-01",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        resp = requests.post("https://api.monday.com/v2", headers=headers, json={
+            "query": query,
+            "variables": {
+                "boardId": [board_id],
+                "propCode": [property_code]
+            }
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if "errors" in data:
+            logger.error(f"Monday API Error: {data['errors']}")
+            return jsonify({"error": "Error querying Monday.com. Check server logs."}), 500
+            
+        items = data.get("data", {}).get("items_page_by_column_values", {}).get("items", [])
+        return jsonify(items)
+        
+    except Exception as e:
+        logger.error(f"Failed to query Monday.com: {e}")
+        return jsonify({"error": "Failed to connect to Monday.com"}), 500
 
 @app.route("/api/boldsign-webhook", methods=["POST"])
 def boldsign_webhook():
