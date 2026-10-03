@@ -263,7 +263,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
 
-def create_acceptance_slides(prs, logo_data):
+def create_acceptance_slides(prs, logo_data, property_code=None):
     """Generates two full-width legal disclaimer slides."""
     slate_text = RGBColor.from_string('0F172A')
     red_text = RGBColor.from_string('BE123C')
