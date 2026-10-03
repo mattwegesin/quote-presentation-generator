@@ -300,7 +300,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
 
-def create_acceptance_slides(prs, logo_data, property_code=None):
+def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False):
     """Generates two full-width legal disclaimer slides."""
     slate_text = RGBColor.from_string('0F172A')
     red_text = RGBColor.from_string('BE123C')
@@ -382,24 +382,25 @@ def create_acceptance_slides(prs, logo_data, property_code=None):
         button_left = Inches(4.166)
         button_top = Inches(6.0)
 
-        # 1. Inject BoldSign text tag FIRST so it sits on the bottom Z-layer (behind the button)
-        tag_tb = slide2.shapes.add_textbox(button_left, button_top, button_width, button_height)
-        tag_p = tag_tb.text_frame.paragraphs[0]
-        tag_r = tag_p.add_run()
-        # Valid BoldSign text tag syntax padded to establish field width
-        tag_r.text = r"{{     sign|1|*     }}"
-        # Make the text a normal color so LibreOffice's PDF optimizer doesn't delete it
-        tag_r.font.size = Pt(12)
-        tag_r.font.color.rgb = slate_text
-        tag_p.alignment = PP_ALIGN.CENTER
-        
-        # 2. Add the modern CTA Button Image OVER the text tag to hide it
+        # 1. Add the modern CTA Button Image
         btn_image_stream = create_cta_button_image()
         cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
         
-        # 3. Apply hyperlink directly to the image object
+        # 2. Apply hyperlink directly to the image object
         link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
         cta_pic.click_action.hyperlink.address = link_url
+
+        # 3. Inject BoldSign text tag BELOW the button so it is not hidden or stripped by LibreOffice
+        tag_top = button_top + button_height + Inches(0.1)
+        tag_tb = slide2.shapes.add_textbox(button_left, tag_top, button_width, Inches(0.4))
+        tag_p = tag_tb.text_frame.paragraphs[0]
+        tag_r = tag_p.add_run()
+        # Valid BoldSign text tag syntax padded to establish field width
+        tag_r.text = r"{{             sign|1|*             }}"
+        # Use an off-white color (#FEFEFE) so the human eye can't see it easily, but the PDF renderer doesn't delete it as invisible
+        tag_r.font.size = Pt(8)
+        tag_r.font.color.rgb = RGBColor.from_string('FEFEFE')
+        tag_p.alignment = PP_ALIGN.CENTER
 
 def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None):
     """
