@@ -177,35 +177,32 @@ def generate():
             # The python-pptx coordinates for the physical Signature and Date lines we just drew are:
             # Signature Line: Left=2.5", Top=6.3", Width=4.0"
             # Date Line: Left=8.0", Top=6.3", Width=3.5"
-            #
-            # LibreOffice compresses 13.333" width to 10.0" PDF width (0.75x scaling).
-            # Height remains 7.5".
-            # BoldSign requires 96 DPI for the final PDF dimensions (10.0" x 7.5").
-            #
-            # Sig X = (2.5 * 0.75) * 96 = 180
-            # Sig Y = 6.3 * 96 = 604.8. Offset -48px up so it sits directly above the line -> Y = 557
-            # Sig Width = (4.0 * 0.75) * 96 = 288
+            # BoldSign API Coordinate System Conversion (96 DPI, Origin Top-Left):
+            # Sig X = 2.5 * 96 = 240
+            # Sig Y = 6.3 * 96 = 604.8. Offset -48px (0.5") up so the signature block sits perfectly on top of the line. -> Y = 557
+            # Sig Width = 4.0 * 96 = 384
             # Sig Height = 48
-            # Date X = (8.0 * 0.75) * 96 = 576
-            # Date Width = (3.5 * 0.75) * 96 = 252
+            # Date X = 8.0 * 96 = 768
+            # Date Width = 3.5 * 96 = 336
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
                 'Signers[0][formFields][0][pageNumber]': str(target_page),
-                'Signers[0][formFields][0][bounds][x]': '180',
+                'Signers[0][formFields][0][bounds][x]': '240',
                 'Signers[0][formFields][0][bounds][y]': '557',
-                'Signers[0][formFields][0][bounds][width]': '288',
+                'Signers[0][formFields][0][bounds][width]': '384',
                 'Signers[0][formFields][0][bounds][height]': '48',
                 'Signers[0][formFields][0][isRequired]': 'true',
                 
                 'Signers[0][formFields][1][id]': 'date_block',
                 'Signers[0][formFields][1][fieldType]': 'DateSigned',
                 'Signers[0][formFields][1][pageNumber]': str(target_page),
-                'Signers[0][formFields][1][bounds][x]': '576',
+                'Signers[0][formFields][1][bounds][x]': '768',
                 'Signers[0][formFields][1][bounds][y]': '557',
-                'Signers[0][formFields][1][bounds][width]': '252',
+                'Signers[0][formFields][1][bounds][width]': '336',
                 'Signers[0][formFields][1][bounds][height]': '48',
-                'Signers[0][formFields][1][isRequired]': 'true'
+                'Signers[0][formFields][1][isRequired]': 'true',
+                'Signers[0][formFields][1][dateFormat]': 'MM/dd/yyyy'
             })
 
         resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
