@@ -478,7 +478,7 @@
             <label for="property_code" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Property / INN Code</label>
             <div style="display: flex; gap: 0.5rem;">
               <input type="text" id="property_code" name="property_code" required placeholder="e.g. ABCTX" style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
-              <button type="button" id="btnLookup" style="background-color: var(--secondary-slate); color: white; padding: 0 1rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Lookup Quotes</button>
+              <button type="button" id="btnLookup" style="background-color: var(--secondary-slate); color: white; padding: 0 1rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">Lookup Monday Projects</button>
             </div>
           </div>
           <div class="input-group" id="monday_item_group" style="display: none;">
@@ -714,7 +714,7 @@
           showError(err.message);
           mondayItemGroup.style.display = 'none';
         } finally {
-          btnLookup.textContent = "Lookup Quotes";
+          btnLookup.textContent = "Lookup Monday Projects";
           btnLookup.disabled = false;
         }
       });
