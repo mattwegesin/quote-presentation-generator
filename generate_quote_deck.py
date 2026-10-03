@@ -390,18 +390,6 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
         cta_pic.click_action.hyperlink.address = link_url
 
-        # 3. Inject BoldSign text tag BELOW the button so it is not hidden or stripped by LibreOffice
-        tag_top = button_top + button_height + Inches(0.1)
-        tag_tb = slide2.shapes.add_textbox(button_left, tag_top, button_width, Inches(0.4))
-        tag_p = tag_tb.text_frame.paragraphs[0]
-        tag_r = tag_p.add_run()
-        # Valid BoldSign text tag syntax padded to establish field width
-        tag_r.text = r"{{             sign|1|*             }}"
-        # Use an off-white color (#FEFEFE) so the human eye can't see it easily, but the PDF renderer doesn't delete it as invisible
-        tag_r.font.size = Pt(8)
-        tag_r.font.color.rgb = RGBColor.from_string('FEFEFE')
-        tag_p.alignment = PP_ALIGN.CENTER
-
 def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None):
     """
     Generates the presentation deck by extracting quote figures from an Excel workbook

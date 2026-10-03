@@ -130,8 +130,8 @@ def generate():
         excel_stream = io.BytesIO(quote_excel_file.read())
 
         # Generate the compiled presentation in-memory
-        output_stream = generate_presentation(pptx_stream, excel_stream, property_code=property_code)
-        
+        output_stream, target_page = generate_presentation(pptx_stream, excel_stream, property_code=property_code)
+
         # Convert PPTX to PDF
         output_stream.seek(0)
         pdf_stream = convert_pptx_to_pdf(output_stream)
@@ -140,30 +140,47 @@ def generate():
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
         if not boldsign_api_key:
             raise ValueError("BOLDSIGN_API_KEY is missing from Render Environment Variables. Please add it to generate the document.")
-            
+
         logger.info(f"Sending document to BoldSign for {property_code}")
         pdf_stream.seek(0)
-        
+
         headers = {
             'X-API-KEY': boldsign_api_key,
             'Accept': 'application/json'
         }
-        
+
         files = {
             'Files': ('Generated_Proposal.pdf', pdf_stream.read(), 'application/pdf')
         }
-        
+
         data = {
             'Title': f"Hospitality Technologies Agreement - {property_code}",
             'DisableEmails': 'true',
             'ExpiryDays': '14',
-            'UseTextTags': 'true',
             'Signers[0][name]': signer_name,
             'Signers[0][emailAddress]': signer_email,
             'Signers[0][signerType]': 'Signer',
             'CustomField': f"PropertyCode={property_code}"
         }
-        
+
+        # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
+        if target_page:
+            # 13.333" wide x 7.5" high @ 72 DPI = 960 x 540
+            # Button Left = 4.166" * 72 = 300px
+            # Button Top = 6.0" * 72 = 432px
+            # Button Width = 5.0" * 72 = 360px
+            # Button Height = 0.7" * 72 = 50px
+            data.update({
+                'Signers[0][formFields][0][id]': 'signature_block',
+                'Signers[0][formFields][0][fieldType]': 'Signature',
+                'Signers[0][formFields][0][pageNumber]': str(target_page),
+                'Signers[0][formFields][0][bounds][x]': '300',
+                'Signers[0][formFields][0][bounds][y]': '432',
+                'Signers[0][formFields][0][bounds][width]': '360',
+                'Signers[0][formFields][0][bounds][height]': '50',
+                'Signers[0][formFields][0][isRequired]': 'true'
+            })
+
         resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
         if resp.status_code not in (200, 201):
             logger.error(f"BoldSign API Error: {resp.status_code} - {resp.text}")
