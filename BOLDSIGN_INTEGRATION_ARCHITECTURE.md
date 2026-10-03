@@ -57,9 +57,15 @@ BoldSign provides REST APIs that natively accept PPTX and PDF files. When the pr
   * **`Title`:** `"Hospitality Technologies Agreement - [INN_CODE]"`
   * **`Files`:** Streamed directly from RAM (`io.BytesIO`)
   * **`DisableEmails`:** `true` (Suppresses BoldSign default emails so the sales team controls presentation delivery)
+  * **`ExpiryDays`:** `14` (Enforces a 14-day expiration to protect against hardware pricing fluctuations)
   * **`Signers`:** Customer Name, Email, and role
   * **`CustomField`:** Embeds the Property Code or Monday Item ID for callback tracking
   * **`FormFields`:** Pre-positions Signature, Printed Name, Title, and Date fields onto the final Acceptance Slide coordinates.
+
+### Automated Price Protection & Cleanup Policy
+To prevent old, invalidated quotes from being signed and to keep the BoldSign dashboard clutter-free:
+1. **14-Day Expiration:** The API payload strictly enforces a 14-day signing window via `ExpiryDays: 14`. After 14 days, the document status automatically shifts to **Expired**.
+2. **Automated Deletion:** In the BoldSign Admin Dashboard (Settings > Document Settings), the **Automatic Document Deletion** policy must be enabled to automatically and permanently delete all documents with the status **Expired** after a specified retention period.
 
 ---
 
