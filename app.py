@@ -1,6 +1,8 @@
 import os
 import io
+import json
 import logging
+import requests
 from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
 from generate_quote_deck import generate_presentation
@@ -80,6 +82,13 @@ def generate():
         return redirect(url_for("index"))
 
     try:
+        property_code = request.form.get("property_code", "").strip()
+        signer_name = request.form.get("signer_name", "").strip()
+        signer_email = request.form.get("signer_email", "").strip()
+        
+        if not property_code or not signer_name or not signer_email:
+            raise ValueError("Property Code, Signer Name, and Signer Email are required.")
+
         # Read uploaded files directly into in-memory BytesIO buffers
         logger.info(
             "Buffering files in memory: base='%s', quote='%s'",
@@ -90,7 +99,45 @@ def generate():
         excel_stream = io.BytesIO(quote_excel_file.read())
 
         # Generate the compiled presentation in-memory
-        output_stream = generate_presentation(pptx_stream, excel_stream)
+        output_stream = generate_presentation(pptx_stream, excel_stream, property_code=property_code)
+
+        # Send to BoldSign
+        boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+        if boldsign_api_key:
+            logger.info(f"Sending document to BoldSign for {property_code}")
+            output_stream.seek(0)
+            
+            headers = {
+                'X-API-KEY': boldsign_api_key,
+                'Accept': 'application/json'
+            }
+            
+            files = {
+                'Files': ('Generated_Proposal.pptx', output_stream.read(), 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+            }
+            
+            # Simple signature block placement. In production, we'd add precise bounding boxes.
+            signers = [{
+                "name": signer_name,
+                "emailAddress": signer_email,
+                "signerType": "Signer"
+            }]
+            
+            data = {
+                'Title': f"Hospitality Technologies Agreement - {property_code}",
+                'DisableEmails': 'true',
+                'ExpiryDays': '14',
+                'Signers': json.dumps(signers),
+                'CustomField': f"PropertyCode={property_code}"
+            }
+            
+            resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
+            if resp.status_code not in (200, 201):
+                logger.error(f"BoldSign API Error: {resp.status_code} - {resp.text}")
+            else:
+                logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
+            
+            output_stream.seek(0)
 
         logger.info("Successfully compiled proposal deck. Streaming 'Generated_Proposal.pptx' to client.")
 
@@ -108,6 +155,76 @@ def generate():
             return jsonify({"success": False, "error": err_msg}), 500
         flash(err_msg, "error")
         return redirect(url_for("index"))
+
+@app.route("/sign/<property_code>", methods=["GET"])
+def sign_document(property_code):
+    """Dynamic gateway redirecting to BoldSign embedded signing link."""
+    boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+    if not boldsign_api_key:
+        return "BoldSign integration not configured.", 500
+        
+    headers = {
+        'X-API-KEY': boldsign_api_key,
+        'Accept': 'application/json'
+    }
+    
+    # Search for the document by title
+    search_url = f"https://api.boldsign.com/v1/document/list?searchQuery={property_code}&pageSize=10"
+    resp = requests.get(search_url, headers=headers)
+    if resp.status_code != 200:
+        return "Failed to search BoldSign documents.", 500
+        
+    data = resp.json()
+    docs = data.get("result", [])
+    if not docs:
+        return "Document not found or has expired.", 404
+        
+    # Find the most recent matching document
+    target_doc = None
+    target_title = f"Hospitality Technologies Agreement - {property_code}"
+    for doc in docs:
+        if doc.get("messageTitle") == target_title and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
+            target_doc = doc
+            break
+            
+    if not target_doc:
+        return "No active document found for signing. It may have expired.", 404
+        
+    document_id = target_doc.get("documentId")
+    signer_email = target_doc.get("signers")[0].get("signerEmail")
+    
+    # Get Embedded Sign Link
+    link_url = f"https://api.boldsign.com/v1/document/getEmbeddedSignLink?documentId={document_id}&signerEmail={signer_email}"
+    link_resp = requests.get(link_url, headers=headers)
+    if link_resp.status_code != 200:
+        return f"Failed to generate signing link: {link_resp.text}", 500
+        
+    sign_link = link_resp.json().get("signLink")
+    if sign_link:
+        # Redirect client directly into the signing interface
+        return redirect(sign_link)
+    
+    return "Error generating signature link.", 500
+
+@app.route("/api/boldsign-webhook", methods=["POST"])
+def boldsign_webhook():
+    """Receives completion events from BoldSign to sync with Monday.com and SharePoint."""
+    # Since this is an MVP demonstration, we will acknowledge the webhook and log the event.
+    # In a full production setup, this would execute the Monday.com GraphQL mutations 
+    # and Microsoft Graph API PUT requests as detailed in the architecture spec.
+    try:
+        event = request.json
+        if event and event.get("event") == "DocumentCompleted":
+            doc_id = event.get("document", {}).get("documentId")
+            logger.info(f"Webhook Received: DocumentCompleted for {doc_id}")
+            # Placeholder for Monday.com Sync
+            # Placeholder for MS Graph Archival
+            return jsonify({"status": "acknowledged", "sync": "pending"}), 200
+            
+        return jsonify({"status": "ignored"}), 200
+    except Exception as e:
+        logger.error(f"Webhook processing error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/health", methods=["GET"])
 def health():

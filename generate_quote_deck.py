@@ -338,7 +338,20 @@ def create_acceptance_slides(prs, logo_data):
     add_p(tf2, "It is further understood that acceptance of this proposal includes acceptance of all the attached terms, conditions and monthly charges. The total price listed includes all shipping and handling charges, but does not include any applicable state, local or national sales taxes. These additional state, local or national sales taxes will be included, as required, upon final billing. Any required lodging shall be provided by the customer unless otherwise stated in advance. Please sign and date all pages of the quote.", bullet=True)
     add_p(tf2, "* Monthly Lease Price is contingent on approved financing.", bold=True)
 
-def generate_presentation(pptx_source, excel_source, output_target=None):
+    if property_code:
+        # Add a CTA link on slide 2
+        tb_cta = slide2.shapes.add_textbox(Inches(0.83), Inches(5.8), Inches(10), Inches(0.5))
+        p_cta = tb_cta.text_frame.paragraphs[0]
+        r_cta = p_cta.add_run()
+        r_cta.text = "Ready to move forward? Click here to electronically sign."
+        hlink = r_cta.hyperlink
+        hlink.address = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
+        r_cta.font.name = 'Montserrat'
+        r_cta.font.size = Pt(14)
+        r_cta.font.bold = True
+        r_cta.font.color.rgb = RGBColor.from_string('0072CE')
+
+def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None):
     """
     Generates the presentation deck by extracting quote figures from an Excel workbook
     and injecting formatted slides into a base PowerPoint presentation.
@@ -456,7 +469,7 @@ def generate_presentation(pptx_source, excel_source, output_target=None):
         create_pdf_style_slide(prs, "Support After Installation", monthly, logo_data=logo_data, is_monthly=True)
 
     create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data)
-    create_acceptance_slides(prs, logo_data=logo_data)
+    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code)
 
     # Shift standard closer slide back to the end
     if orig_last_idx >= 0 and len(prs.slides) > 1:
