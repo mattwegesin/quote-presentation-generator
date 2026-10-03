@@ -189,17 +189,7 @@ def generate():
                 'Signers[0][formFields][0][bounds][y]': '584',
                 'Signers[0][formFields][0][bounds][width]': '214',
                 'Signers[0][formFields][0][bounds][height]': '30',
-                'Signers[0][formFields][0][isRequired]': 'true',
-                
-                'Signers[0][formFields][1][id]': 'date_block',
-                'Signers[0][formFields][1][fieldType]': 'TextBox',
-                'Signers[0][formFields][1][pageNumber]': str(target_page),
-                'Signers[0][formFields][1][bounds][x]': '673',
-                'Signers[0][formFields][1][bounds][y]': '584',
-                'Signers[0][formFields][1][bounds][width]': '173',
-                'Signers[0][formFields][1][bounds][height]': '30',
-                'Signers[0][formFields][1][isRequired]': 'true',
-                'Signers[0][formFields][1][placeholder]': 'MM/DD/YYYY'
+                'Signers[0][formFields][0][isRequired]': 'true'
             })
 
         resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
