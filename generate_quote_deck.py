@@ -6,6 +6,39 @@ from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
+from PIL import Image, ImageDraw, ImageFont
+
+def create_cta_button_image():
+    """Generates a high-quality modern CTA button as an in-memory PNG to bypass PDF hyperlink styling issues."""
+    width, height = 1000, 140
+    img = Image.new('RGBA', (width, height), color=(0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    
+    # Draw button with shadow-like aesthetic (flat modern)
+    # Background border/shadow
+    d.rounded_rectangle([(0, 0), (width, height)], radius=20, fill=(2, 132, 199))
+    # Main button face
+    d.rounded_rectangle([(2, 2), (width-2, height-6)], radius=20, fill=(14, 165, 233))
+    
+    # Try to load a nice font, fallback to default if not available
+    try:
+        # Works on most linux/docker environments with fonts-liberation
+        font = ImageFont.truetype("LiberationSans-Bold.ttf", 48)
+    except:
+        try:
+            # Works on macOS
+            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 48)
+        except:
+            font = ImageFont.load_default()
+            
+    text = "READY TO MOVE FORWARD? CLICK TO E-SIGN"
+    # Center text
+    d.text((width/2, height/2 - 2), text, fill="white", anchor="mm", font=font)
+    
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
 
 def move_slide(prs, old_index, new_index):
     """Moves the closing slide to the absolute end of the deck."""
@@ -339,41 +372,19 @@ def create_acceptance_slides(prs, logo_data, property_code=None):
     add_p(tf2, "* Monthly Lease Price is contingent on approved financing.", bold=True)
 
     if property_code:
-        # Add a centered, modern CTA Button on slide 2
+        # Add a centered, modern CTA Button on slide 2 using a rendered image
         button_width = Inches(5.0)
         button_height = Inches(0.7)
         # Center horizontally: (13.333 - 5.0) / 2 = 4.166
         button_left = Inches(4.166)
         button_top = Inches(6.0)
         
-        cta_shape = slide2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, button_left, button_top, button_width, button_height)
-        
-        # Style the button fill and border
-        cta_shape.fill.solid()
-        cta_shape.fill.fore_color.rgb = RGBColor.from_string('0ea5e9') # Vibrant modern blue
-        cta_shape.line.color.rgb = RGBColor.from_string('0284c7') # Slightly darker border
-        cta_shape.line.width = Pt(1.5)
-        
-        # Add a subtle drop shadow for a 3D/infographic pop
-        cta_shape.shadow.inherit = False
-        
-        tf_cta = cta_shape.text_frame
-        p_cta = tf_cta.paragraphs[0]
-        p_cta.alignment = PP_ALIGN.CENTER
-        
-        r_cta = p_cta.add_run()
-        r_cta.text = "READY TO MOVE FORWARD? CLICK TO E-SIGN"
+        btn_image_stream = create_cta_button_image()
+        cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
         
         link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
-        # Apply hyperlink FIRST
-        r_cta.hyperlink.address = link_url
-        cta_shape.click_action.hyperlink.address = link_url
-        
-        # Apply formatting SECOND so PowerPoint does not override it with the default blue link color
-        r_cta.font.name = 'Montserrat'
-        r_cta.font.size = Pt(14)
-        r_cta.font.bold = True
-        r_cta.font.color.rgb = RGBColor.from_string('FFFFFF') # Crisp white
+        # Apply hyperlink directly to the image object. LibreOffice perfectly preserves image hyperlinks in PDFs.
+        cta_pic.click_action.hyperlink.address = link_url
 
         # Inject hidden BoldSign text tag for automatic signature placement
         tag_tb = slide2.shapes.add_textbox(Inches(0.83), Inches(6.8), Inches(3), Inches(0.4))

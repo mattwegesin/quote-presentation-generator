@@ -138,38 +138,40 @@ def generate():
 
         # Send to BoldSign
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
-        if boldsign_api_key:
-            logger.info(f"Sending document to BoldSign for {property_code}")
-            pdf_stream.seek(0)
+        if not boldsign_api_key:
+            raise ValueError("BOLDSIGN_API_KEY is missing from Render Environment Variables. Please add it to generate the document.")
             
-            headers = {
-                'X-API-KEY': boldsign_api_key,
-                'Accept': 'application/json'
-            }
-            
-            files = {
-                'Files': ('Generated_Proposal.pdf', pdf_stream.read(), 'application/pdf')
-            }
-            
-            data = {
-                'Title': f"Hospitality Technologies Agreement - {property_code}",
-                'DisableEmails': 'true',
-                'ExpiryDays': '14',
-                'UseTextTags': 'true',
-                'Signers[0][name]': signer_name,
-                'Signers[0][emailAddress]': signer_email,
-                'Signers[0][signerType]': 'Signer',
-                'CustomField': f"PropertyCode={property_code}"
-            }
-            
-            resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
-            if resp.status_code not in (200, 201):
-                logger.error(f"BoldSign API Error: {resp.status_code} - {resp.text}")
-                raise RuntimeError(f"Failed to create BoldSign document: {resp.text}")
-            else:
-                logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
-            
-            pdf_stream.seek(0)
+        logger.info(f"Sending document to BoldSign for {property_code}")
+        pdf_stream.seek(0)
+        
+        headers = {
+            'X-API-KEY': boldsign_api_key,
+            'Accept': 'application/json'
+        }
+        
+        files = {
+            'Files': ('Generated_Proposal.pdf', pdf_stream.read(), 'application/pdf')
+        }
+        
+        data = {
+            'Title': f"Hospitality Technologies Agreement - {property_code}",
+            'DisableEmails': 'true',
+            'ExpiryDays': '14',
+            'UseTextTags': 'true',
+            'Signers[0][name]': signer_name,
+            'Signers[0][emailAddress]': signer_email,
+            'Signers[0][signerType]': 'Signer',
+            'CustomField': f"PropertyCode={property_code}"
+        }
+        
+        resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
+        if resp.status_code not in (200, 201):
+            logger.error(f"BoldSign API Error: {resp.status_code} - {resp.text}")
+            raise RuntimeError(f"Failed to create BoldSign document: {resp.text}")
+        else:
+            logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
+        
+        pdf_stream.seek(0)
 
         logger.info("Successfully compiled proposal deck. Streaming 'Generated_Proposal.pdf' to client.")
 
