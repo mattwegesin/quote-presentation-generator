@@ -129,12 +129,21 @@ def generate():
         pptx_stream = io.BytesIO(base_pptx_file.read())
         excel_stream = io.BytesIO(quote_excel_file.read())
 
-        # Generate the compiled presentation in-memory
-        output_stream, target_page = generate_presentation(pptx_stream, excel_stream, property_code=property_code)
+        # ---------------------------------------------------------
+        # GENERATE FOR BOLDSIGN (No CTA Button, Has Signature Lines)
+        # ---------------------------------------------------------
+        output_stream_bs, target_page = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True)
+        output_stream_bs.seek(0)
+        pdf_stream_bs = convert_pptx_to_pdf(output_stream_bs)
 
-        # Convert PPTX to PDF
-        output_stream.seek(0)
-        pdf_stream = convert_pptx_to_pdf(output_stream)
+        # ---------------------------------------------------------
+        # GENERATE FOR CLIENT (Has CTA Button, No Signature Lines)
+        # ---------------------------------------------------------
+        pptx_stream.seek(0)
+        excel_stream.seek(0)
+        output_stream_client, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False)
+        output_stream_client.seek(0)
+        pdf_stream_client = convert_pptx_to_pdf(output_stream_client)
 
         # Send to BoldSign
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
@@ -142,7 +151,7 @@ def generate():
             raise ValueError("BOLDSIGN_API_KEY is missing from Render Environment Variables. Please add it to generate the document.")
 
         logger.info(f"Sending document to BoldSign for {property_code}")
-        pdf_stream.seek(0)
+        pdf_stream_bs.seek(0)
 
         headers = {
             'X-API-KEY': boldsign_api_key,
@@ -150,7 +159,7 @@ def generate():
         }
 
         files = {
-            'Files': ('Generated_Proposal.pdf', pdf_stream.read(), 'application/pdf')
+            'Files': ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf')
         }
 
         data = {
@@ -165,20 +174,34 @@ def generate():
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
         if target_page:
-            # 13.333" wide x 7.5" high @ 72 DPI = 960 x 540
-            # Button Left = 4.166" * 72 = 300px
-            # Button Top = 6.0" * 72 = 432px
-            # Button Width = 5.0" * 72 = 360px
-            # Button Height = 0.7" * 72 = 50px
+            # The python-pptx coordinates for the Signature and Date textboxes we just drew are:
+            # Signature Box: Left=4.166", Top=6.0", Width=2.5", Height=0.5"
+            # Date Box: Left=6.666", Top=6.0", Width=2.5", Height=0.5"
+            # 72 DPI Conversion:
+            # Sig X = 4.166 * 72 = 300
+            # Sig Y = 6.0 * 72 = 432
+            # Sig Width = 2.5 * 72 = 180
+            # Sig Height = 0.5 * 72 = 36
+            # Date X = 6.666 * 72 = 480
+            # Date Y = 432
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
                 'Signers[0][formFields][0][pageNumber]': str(target_page),
                 'Signers[0][formFields][0][bounds][x]': '300',
                 'Signers[0][formFields][0][bounds][y]': '432',
-                'Signers[0][formFields][0][bounds][width]': '360',
-                'Signers[0][formFields][0][bounds][height]': '50',
-                'Signers[0][formFields][0][isRequired]': 'true'
+                'Signers[0][formFields][0][bounds][width]': '180',
+                'Signers[0][formFields][0][bounds][height]': '36',
+                'Signers[0][formFields][0][isRequired]': 'true',
+                
+                'Signers[0][formFields][1][id]': 'date_block',
+                'Signers[0][formFields][1][fieldType]': 'DateSigned',
+                'Signers[0][formFields][1][pageNumber]': str(target_page),
+                'Signers[0][formFields][1][bounds][x]': '480',
+                'Signers[0][formFields][1][bounds][y]': '432',
+                'Signers[0][formFields][1][bounds][width]': '180',
+                'Signers[0][formFields][1][bounds][height]': '36',
+                'Signers[0][formFields][1][isRequired]': 'true'
             })
 
         resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
@@ -187,13 +210,12 @@ def generate():
             raise RuntimeError(f"Failed to create BoldSign document: {resp.text}")
         else:
             logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
-        
-        pdf_stream.seek(0)
 
         logger.info("Successfully compiled proposal deck. Streaming 'Generated_Proposal.pdf' to client.")
+        pdf_stream_client.seek(0)
 
         return send_file(
-            pdf_stream,
+            pdf_stream_client,
             mimetype="application/pdf",
             as_attachment=True,
             download_name="Generated_Proposal.pdf"

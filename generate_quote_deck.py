@@ -304,11 +304,11 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     """Generates two full-width legal disclaimer slides."""
     slate_text = RGBColor.from_string('0F172A')
     red_text = RGBColor.from_string('BE123C')
-    
+
     def setup_slide(title_text):
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         add_logo_to_slide(slide, logo_data)
-        
+
         tb1 = slide.shapes.add_textbox(Inches(0.83), Inches(0.12), Inches(10), Inches(0.5))
         p1 = tb1.text_frame.paragraphs[0]
         p1.text = "FINANCIAL INVESTMENT OVERVIEW"
@@ -316,7 +316,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         p1.font.size = Pt(12)
         p1.font.bold = True
         p1.font.color.rgb = red_text
-        
+
         tb2 = slide.shapes.add_textbox(Inches(0.83), Inches(0.29), Inches(10), Inches(0.5))
         p2 = tb2.text_frame.paragraphs[0]
         p2.text = title_text
@@ -325,7 +325,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         p2.font.bold = True
         p2.font.color.rgb = slate_text
         return slide
-    
+
     def add_p(tf, text, bold=False, bullet=False):
         p = tf.add_paragraph() if tf.paragraphs[0].text else tf.paragraphs[0]
         p.text = text
@@ -344,12 +344,12 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     tb = slide1.shapes.add_textbox(Inches(0.83), Inches(1.0), Inches(11.5), Inches(5.5))
     tf = tb.text_frame
     tf.word_wrap = True
-        
+
     add_p(tf, "Supply Chain & Pricing Disclaimer", bold=True)
     add_p(tf, "Due to ongoing global supply constraints affecting RAM and related electronic components, product availability, pricing, and delivery timelines may change without notice. All quotes and pricing are based on current supplier costs and component availability at the time issued.")
     add_p(tf, "Hospitality Technologies reserves the right to adjust pricing, revise delivery schedules, or substitute equivalent components if manufacturer pricing, allocations, or supply conditions change prior to order fulfillment. Hospitality Technologies shall not be held liable for shortages, backorders, delays, or price increases resulting from RAM supply constraints or other upstream component availability issues.")
     add_p(tf, "Acceptance of a quote, purchase order, or invoice acknowledges these potential supply chain conditions.")
-    
+
     add_p(tf, "Caveats", bold=True)
     add_p(tf, "Any applicable License fees will be prorated according to each individual hotel's billing agreement and payment history with Insight.", bullet=True)
     add_p(tf, "Any access holes needed, in order to run Cat6 Ethernet wiring, are to be approved in advance by the customer.", bullet=True)
@@ -364,7 +364,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     tb2 = slide2.shapes.add_textbox(Inches(0.83), Inches(1.0), Inches(11.5), Inches(5.5))
     tf2 = tb2.text_frame
     tf2.word_wrap = True
-    
+
     add_p(tf2, "Disclosures", bold=True)
     add_p(tf2, "This proposal is hereby accepted and Hospitality Technologies is hereby authorized to proceed with work, contingent upon credit approval by Hospitality Technologies and receiving 80% down payment (not necessary with Lease Option). The final 20% is due no later than 10 days after completion. All orders received which are $5000.00 or less will be paid in full. If this quote is an equipment or license-only purchase, 100% of the total quoted is due upon acceptance. All credit card transactions are subject to a 5% processing fee.", bullet=True)
     add_p(tf2, "In the event that there are unforeseen circumstances which require extra equipment to be installed, Hospitality Technologies reserves the right to change the final quoted amount based on the extra equipment and/or labor required to install said equipment.", bullet=True)
@@ -382,15 +382,33 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         button_left = Inches(4.166)
         button_top = Inches(6.0)
 
-        # 1. Add the modern CTA Button Image
-        btn_image_stream = create_cta_button_image()
-        cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
-        
-        # 2. Apply hyperlink directly to the image object
-        link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
-        cta_pic.click_action.hyperlink.address = link_url
+        if for_boldsign:
+            # Draw Signature and Date fields instead of a button
+            sig_tb = slide2.shapes.add_textbox(Inches(4.166), Inches(6.0), Inches(2.5), Inches(0.5))
+            p_sig = sig_tb.text_frame.paragraphs[0]
+            r_sig = p_sig.add_run()
+            r_sig.text = "Signature: __________________________"
+            r_sig.font.name = 'Montserrat'
+            r_sig.font.size = Pt(14)
+            r_sig.font.color.rgb = slate_text
 
-def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None):
+            date_tb = slide2.shapes.add_textbox(Inches(6.666), Inches(6.0), Inches(2.5), Inches(0.5))
+            p_date = date_tb.text_frame.paragraphs[0]
+            r_date = p_date.add_run()
+            r_date.text = "Date: _____________________"
+            r_date.font.name = 'Montserrat'
+            r_date.font.size = Pt(14)
+            r_date.font.color.rgb = slate_text
+        else:
+            # 1. Add the modern CTA Button Image
+            btn_image_stream = create_cta_button_image()
+            cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
+
+            # 2. Apply hyperlink directly to the image object
+            link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
+            cta_pic.click_action.hyperlink.address = link_url
+
+def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False):
     """
     Generates the presentation deck by extracting quote figures from an Excel workbook
     and injecting formatted slides into a base PowerPoint presentation.
@@ -508,7 +526,7 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
         create_pdf_style_slide(prs, "Support After Installation", monthly, logo_data=logo_data, is_monthly=True)
 
     create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data)
-    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code)
+    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign)
 
     # Shift standard closer slide back to the end
     if orig_last_idx >= 0 and len(prs.slides) > 1:
