@@ -274,6 +274,15 @@ def sign_document(property_code):
     
     return "Error generating signature link.", 500
 
+@app.route("/api/debug/columns", methods=["GET"])
+def debug_columns():
+    monday_token = os.environ.get("MONDAY_API_TOKEN")
+    board_id = "18424851511"
+    query = "query { boards(ids: 18424851511) { columns { id title type settings_str } } }"
+    headers = {"Authorization": monday_token, "API-Version": "2024-01", "Content-Type": "application/json"}
+    resp = requests.post("https://api.monday.com/v2", headers=headers, json={"query": query})
+    return jsonify(resp.json())
+
 @app.route("/api/get_monday_quotes", methods=["POST"])
 def get_monday_quotes():
     property_code = request.form.get("property_code", "").strip()
