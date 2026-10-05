@@ -369,9 +369,14 @@ def boldsign_webhook():
             logger.info("BoldSign Webhook Verification Received.")
             return jsonify({"status": "verified"}), 200
 
-        if event_type == "DocumentCompleted":
-            doc_id = event.get("document", {}).get("documentId")
-            logger.info(f"Webhook Received: DocumentCompleted for {doc_id}")
+        # BoldSign uses 'Completed' for the event type and puts the ID in 'data'
+        if event_type == "Completed":
+            doc_id = event.get("data", {}).get("documentId")
+            if not doc_id:
+                logger.error("Webhook received 'Completed' event but no documentId was found.")
+                return jsonify({"error": "Missing documentId"}), 400
+                
+            logger.info(f"Webhook Received: Completed for {doc_id}")
 
             # 1. Fetch BoldSign CustomField to get MondayItemId
             bs_api_key = os.environ.get("BOLDSIGN_API_KEY")
