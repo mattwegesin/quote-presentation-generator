@@ -246,12 +246,12 @@ def sign_document(property_code):
         
     # Find the most recent matching document
     target_doc = None
-    target_title = f"Hospitality Technologies Agreement - {property_code}"
+    target_title_prefix = f"Hospitality Technologies Agreement - {property_code}"
     for doc in docs:
-        if doc.get("messageTitle") == target_title and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
+        if doc.get("messageTitle", "").startswith(target_title_prefix) and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
             target_doc = doc
             break
-            
+
     if not target_doc:
         return "No active document found for signing. It may have expired.", 404
         
