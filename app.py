@@ -163,9 +163,10 @@ def generate():
             'Files': ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf')
         }
 
-        custom_field = f"PropertyCode={property_code}"
+        import json
+        metadata = {"PropertyCode": property_code}
         if monday_item_id:
-            custom_field += f";MondayItemId={monday_item_id}"
+            metadata["MondayItemId"] = monday_item_id
 
         data = {
             'Title': f"Hospitality Technologies Agreement - {property_code}",
@@ -174,7 +175,7 @@ def generate():
             'Signers[0][name]': signer_name,
             'Signers[0][emailAddress]': signer_email,
             'Signers[0][signerType]': 'Signer',
-            'CustomField': custom_field
+            'Metadata': json.dumps(metadata)
         }
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
@@ -378,18 +379,17 @@ def boldsign_webhook():
                 
             logger.info(f"Webhook Received: Completed for {doc_id}")
 
-            # 1. Fetch BoldSign CustomField to get MondayItemId
+            # 1. Fetch BoldSign Document Properties to get MondayItemId from Metadata
             bs_api_key = os.environ.get("BOLDSIGN_API_KEY")
             bs_headers = {'X-API-KEY': bs_api_key, 'Accept': 'application/json'}
             prop_resp = requests.get(f"https://api.boldsign.com/v1/document/properties?documentId={doc_id}", headers=bs_headers)
             prop_resp.raise_for_status()
 
-            custom_field_str = prop_resp.json().get("customField", "")
-            custom_fields = dict(item.split("=") for item in custom_field_str.split(";") if "=" in item)
-            monday_item_id = custom_fields.get("MondayItemId")
+            doc_metadata = prop_resp.json().get("metaData", {})
+            monday_item_id = doc_metadata.get("MondayItemId")
 
             if not monday_item_id:
-                logger.error("No MondayItemId found in BoldSign CustomField")
+                logger.error("No MondayItemId found in BoldSign Metadata")
                 return jsonify({"status": "error", "message": "Missing MondayItemId"}), 400
 
             # 2. Update Monday.com Status and Extract SharePoint Link
