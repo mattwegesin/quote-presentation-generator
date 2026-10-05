@@ -362,7 +362,13 @@ def boldsign_webhook():
         if not event:
             return jsonify({"status": "ignored"}), 200
 
-        event_type = event.get("event")
+        event_type = event.get("event", {}).get("eventType") if "eventType" in event.get("event", {}) else event.get("event")
+
+        # Handle BoldSign Webhook Verification Ping
+        if event_type == "Verification":
+            logger.info("BoldSign Webhook Verification Received.")
+            return jsonify({"status": "verified"}), 200
+
         if event_type == "DocumentCompleted":
             doc_id = event.get("document", {}).get("documentId")
             logger.info(f"Webhook Received: DocumentCompleted for {doc_id}")
