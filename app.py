@@ -413,7 +413,7 @@ def boldsign_webhook():
             # Update Status to WON
             mutation = """
             mutation ($itemId: ID!, $boardId: ID!) {
-              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "status", value: "{\\"label\\":\\"WON\\"}") {
+              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\\"label\\":\\"WON\\"}") {
                 id
               }
             }
