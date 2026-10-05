@@ -163,19 +163,17 @@ def generate():
             'Files': ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf')
         }
 
-        import json
-        metadata = {"PropertyCode": property_code}
+        title_str = f"Hospitality Technologies Agreement - {property_code}"
         if monday_item_id:
-            metadata["MondayItemId"] = monday_item_id
+            title_str += f" | ID:{monday_item_id}"
 
         data = {
-            'Title': f"Hospitality Technologies Agreement - {property_code}",
+            'Title': title_str,
             'DisableEmails': 'true',
             'ExpiryDays': '14',
             'Signers[0][name]': signer_name,
             'Signers[0][emailAddress]': signer_email,
-            'Signers[0][signerType]': 'Signer',
-            'Metadata': json.dumps(metadata)
+            'Signers[0][signerType]': 'Signer'
         }
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
@@ -379,18 +377,20 @@ def boldsign_webhook():
                 
             logger.info(f"Webhook Received: Completed for {doc_id}")
 
-            # 1. Fetch BoldSign Document Properties to get MondayItemId from Metadata
+            # 1. Fetch BoldSign Document Properties to get MondayItemId from the Title string
             bs_api_key = os.environ.get("BOLDSIGN_API_KEY")
             bs_headers = {'X-API-KEY': bs_api_key, 'Accept': 'application/json'}
             prop_resp = requests.get(f"https://api.boldsign.com/v1/document/properties?documentId={doc_id}", headers=bs_headers)
             prop_resp.raise_for_status()
 
-            doc_metadata = prop_resp.json().get("metaData", {})
-            monday_item_id = doc_metadata.get("MondayItemId")
+            message_title = prop_resp.json().get("messageTitle", "")
+            monday_item_id = None
+            if " | ID:" in message_title:
+                monday_item_id = message_title.split(" | ID:")[1].strip()
 
             if not monday_item_id:
-                logger.error("No MondayItemId found in BoldSign Metadata")
-                return jsonify({"status": "error", "message": "Missing MondayItemId"}), 400
+                logger.error(f"No MondayItemId found in BoldSign Title string: {message_title}")
+                return jsonify({"status": "error", "message": "Missing MondayItemId in Title"}), 400
 
             # 2. Update Monday.com Status and Extract SharePoint Link
             monday_token = os.environ.get("MONDAY_API_TOKEN")
