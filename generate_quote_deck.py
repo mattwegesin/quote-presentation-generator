@@ -109,106 +109,90 @@ def create_pdf_style_slide(prs, title, chunks, logo_data, is_monthly=False):
         p3.font.size = Pt(12)
         p3.font.color.rgb = slate_text
         
-    data = []
-    for s in chunks:
-        data.append({"type": "section_title", "text": s["section"]})
-        data.append({"type": "header"})
-        subtotal = 0
-        for it in s["items"]:
-            unit_cost = it.get("unit_cost", 0.0)
-            data.append({"type": "item", "desc": it["desc"], "part": it["part"], "qty": it["qty"], "unit_cost": unit_cost, "price": it["total"]})
-            subtotal += it["total"]
-        if is_monthly:
-            data.append({"type": "monthly", "val": subtotal})
-        else:
-            data.append({"type": "subtotal", "val": subtotal})
-        data.append({"type": "spacer"})
+    start_y = Inches(1.1) if not is_monthly else Inches(1.3)
+    card_w = Inches(5.6)
+    
+    # Calculate best split point to perfectly balance the two columns
+    def get_chunk_height(s):
+        return 0.5 + (len(s["items"]) * 0.22) + 0.15
 
-    if data and data[-1]["type"] == "spacer":
-        data = data[:-1]
-        
-    rows = len(data)
-    if rows == 0: return slide
+    best_diff = float('inf')
+    best_idx = 1
     
-    start_y = 1.1 if not is_monthly else 1.3
-    table_shape = slide.shapes.add_table(rows, 5, Inches(0.83), Inches(start_y), Inches(11.5), Inches(0.3 * rows))
-    table = table_shape.table
-    
-    table.columns[0].width = Inches(4.5)
-    table.columns[1].width = Inches(2.5)
-    table.columns[2].width = Inches(1.1)
-    table.columns[3].width = Inches(1.7)
-    table.columns[4].width = Inches(1.7)
-    
-    for i, row in enumerate(data):
-        cells = [table.cell(i, j) for j in range(5)]
-        
-        if row["type"] == "section_title":
-            cells[0].merge(cells[4])
-            cells[0].text = "   " + row["text"]
-            cells[0].fill.solid()
-            cells[0].fill.fore_color.rgb = blue_bg
-            p = cells[0].text_frame.paragraphs[0]
-            p.font.name = 'Montserrat'
-            p.font.size = Pt(14)
-            p.font.bold = True
-            p.font.color.rgb = RGBColor.from_string('FFFFFF')
-            p.alignment = PP_ALIGN.LEFT
+    if len(chunks) > 1:
+        for i in range(1, len(chunks)):
+            left_h = sum(get_chunk_height(s) for s in chunks[:i])
+            right_h = sum(get_chunk_height(s) for s in chunks[i:])
+            diff = abs(left_h - right_h)
+            if diff < best_diff:
+                best_diff = diff
+                best_idx = i
+                
+        left_chunks = chunks[:best_idx]
+        right_chunks = chunks[best_idx:]
+    else:
+        left_chunks = chunks
+        right_chunks = []
+
+    def render_column(column_chunks, start_x):
+        current_y = start_y
+        for s in column_chunks:
+            # Calculate height: base padding for title + roughly 0.22" per item
+            num_items = len(s["items"])
+            card_h = Inches(0.5) + Inches(num_items * 0.22)
             
-        elif row["type"] == "header":
-            headers = ["Description", "Item", "Quantity", "Unit Cost", "Price"]
-            for j, h in enumerate(headers):
-                cells[j].text = h
-                cells[j].fill.solid()
-                cells[j].fill.fore_color.rgb = header_grey
-                p = cells[j].text_frame.paragraphs[0]
+            # Base Card (Rounded Rect)
+            c = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, start_x, current_y, card_w, card_h)
+            c.fill.solid()
+            c.fill.fore_color.rgb = light_grey_bg
+            c.line.color.rgb = RGBColor.from_string('E2E8F0')
+            c.line.width = Pt(1)
+            
+            # Section Title (Top of the card)
+            tb_title = slide.shapes.add_textbox(start_x, current_y + Inches(0.05), card_w, Inches(0.3))
+            p = tb_title.text_frame.paragraphs[0]
+            p.text = "  " + s["section"]
+            p.font.name = 'Montserrat'
+            p.font.size = Pt(11)
+            p.font.bold = True
+            p.font.color.rgb = blue_bg
+            
+            # Section Subtotal (Top Right of the card)
+            section_total = sum(it.get("total", 0) for it in s["items"])
+            tb_subtotal = slide.shapes.add_textbox(start_x, current_y + Inches(0.05), card_w - Inches(0.1), Inches(0.3))
+            p_sub = tb_subtotal.text_frame.paragraphs[0]
+            p_sub.text = f"${section_total:,.2f}"
+            p_sub.font.name = 'Montserrat'
+            p_sub.font.size = Pt(11)
+            p_sub.font.bold = True
+            p_sub.font.color.rgb = blue_bg
+            p_sub.alignment = PP_ALIGN.RIGHT
+            
+            # Items list (Below the title)
+            tb_items = slide.shapes.add_textbox(start_x + Inches(0.2), current_y + Inches(0.35), card_w - Inches(0.4), card_h - Inches(0.35))
+            tb_items.text_frame.word_wrap = True
+            
+            first = True
+            for it in s["items"]:
+                if first:
+                    p = tb_items.text_frame.paragraphs[0]
+                    first = False
+                else:
+                    p = tb_items.text_frame.add_paragraph()
+                    
+                p.text = f"{it['qty']}x\t{it['desc']}"
                 p.font.name = 'Montserrat'
-                p.font.size = Pt(11)
-                p.font.bold = True
+                p.font.size = Pt(9)
                 p.font.color.rgb = slate_text
-                if j == 2:
-                    p.alignment = PP_ALIGN.CENTER
-                elif j >= 3:
-                    p.alignment = PP_ALIGN.RIGHT
+                p.space_after = Pt(2)
                 
-        elif row["type"] == "item":
-            cells[0].text = row["desc"]
-            cells[1].text = row["part"]
-            cells[2].text = str(row["qty"])
-            cells[3].text = f"${row['unit_cost']:,.2f}"
-            cells[4].text = f"${row['price']:,.2f}"
-            for j in range(5):
-                cells[j].fill.solid()
-                cells[j].fill.fore_color.rgb = RGBColor.from_string('FFFFFF') if i % 2 == 0 else light_grey_bg
-                p = cells[j].text_frame.paragraphs[0]
-                p.font.name = 'Montserrat'
-                p.font.size = Pt(10)
-                p.font.color.rgb = slate_text
-                if j == 2:
-                    p.alignment = PP_ALIGN.CENTER
-                elif j >= 3:
-                    p.alignment = PP_ALIGN.RIGHT
-                
-        elif row["type"] in ("subtotal", "monthly"):
-            cells[0].merge(cells[3])
-            cells[0].text = "SUBTOTAL" if row["type"] == "subtotal" else "MONTHLY"
-            cells[4].text = f"${row['val']:,.2f}"
-            for j in (0, 4):
-                cells[j].fill.solid()
-                cells[j].fill.fore_color.rgb = RGBColor.from_string('FFFFFF')
-                p = cells[j].text_frame.paragraphs[0]
-                p.font.name = 'Montserrat'
-                p.font.size = Pt(12)
-                p.font.bold = True
-                p.font.color.rgb = slate_text
-                p.alignment = PP_ALIGN.RIGHT
-                
-        elif row["type"] == "spacer":
-            cells[0].merge(cells[4])
-            cells[0].text = ""
+            current_y += card_h + Inches(0.15)
 
-def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
-    """Generates the Investment Summary metric cards."""
+    render_column(left_chunks, Inches(0.83))
+    render_column(right_chunks, Inches(6.7))
+
+def create_summary_cards_slide(prs, total_inv, total_mo, logo_data, section_subtotals=None):
+    """Generates the Investment Summary metric cards and subtotals."""
     blue_bg = RGBColor.from_string('0072CE')
     slate_text = RGBColor.from_string('0F172A')
     red_text = RGBColor.from_string('BE123C')
@@ -232,6 +216,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
     p2.font.bold = True
     p2.font.color.rgb = slate_text
 
+    # Summary Cards Centered Layout
     card_y = Inches(1.8)
     card_w = Inches(4.5)
     card_h = Inches(3.5)
@@ -286,7 +271,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
     p = tb_c2.text_frame.paragraphs[0]
     p.text = "Monthly\nSupport Services"
     p.font.name = 'Montserrat'
-    p.font.size = Pt(22)
+    p.font.size = Pt(16)
     p.font.bold = True
     p.font.color.rgb = slate_text
     p.alignment = PP_ALIGN.CENTER
@@ -295,7 +280,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data):
     p = tb_v2.text_frame.paragraphs[0]
     p.text = f"${total_mo:,.2f}"
     p.font.name = 'Montserrat'
-    p.font.size = Pt(40)
+    p.font.size = Pt(28)
     p.font.bold = True
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
@@ -494,33 +479,53 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
 
     sections = [s for s in sections if s["items"]]
 
-    # Pagination Mapping safely handling variable section counts
-    hw = [sections[0]] if len(sections) > 0 else []
-    sw_misc = sections[1:3] if len(sections) > 1 else []
-    cabling_inst = sections[3:5] if len(sections) > 3 else []
-    pm = [sections[5]] if len(sections) > 5 else []
-    shipping = [sections[6]] if len(sections) > 6 else []
-    monthly = sections[7:] if len(sections) > 7 else []
+    # Separate Capital vs Monthly Sections
+    capital_sections = [s for s in sections if "Monthly" not in s["section"]]
+    monthly_sections = [s for s in sections if "Monthly" in s["section"]]
 
-    grand_total = sum(it["total"] for s in sections for it in s["items"] if "Monthly" not in s["section"])
-    monthly_total = sum(it["total"] for s in monthly for it in s["items"])
+    grand_total = sum(it["total"] for s in capital_sections for it in s["items"])
+    monthly_total = sum(it["total"] for s in monthly_sections for it in s["items"])
+
+    section_subtotals = []
+    for s in capital_sections:
+        total = sum(it["total"] for it in s["items"])
+        section_subtotals.append({"name": s["section"], "total": total})
+
+    # Combine all sections for unified 2-column BOM layout
+    all_sections = capital_sections + monthly_sections
+
+    # Dynamic Slide Chunking for BOM by physical height
+    max_height_per_column = 5.8 # inches
+    max_height_per_slide = max_height_per_column * 2
+    
+    def get_chunk_height(s):
+        # 0.5" for title banner + 0.22" per item + 0.15" bottom margin
+        return 0.5 + (len(s["items"]) * 0.22) + 0.15
+
+    current_slide_chunks = []
+    current_slide_height = 0.0
+    slides_to_render = []
+
+    for s in all_sections:
+        h = get_chunk_height(s)
+        # If adding this chunk exceeds the two-column max height, start a new slide
+        if current_slide_height + h > max_height_per_slide and current_slide_chunks:
+            slides_to_render.append(current_slide_chunks)
+            current_slide_chunks = []
+            current_slide_height = 0.0
+
+        current_slide_chunks.append(s)
+        current_slide_height += h
+
+    if current_slide_chunks:
+        slides_to_render.append(current_slide_chunks)
 
     # Slide Generation Sequence
-    if hw:
-        create_pdf_style_slide(prs, "IHG Connect Solution Investment", hw, logo_data=logo_data)
-    if sw_misc:
-        create_pdf_style_slide(prs, "IHG Connect Solution Investment (Cont.)", sw_misc, logo_data=logo_data)
-    if cabling_inst:
-        create_pdf_style_slide(prs, "Labor & Project Management Costs", cabling_inst, logo_data=logo_data)
-    if pm:
-        create_pdf_style_slide(prs, "Labor & Project Management Costs (Cont.)", pm, logo_data=logo_data)
-    if shipping:
-        create_pdf_style_slide(prs, "Shipping and Travel", shipping, logo_data=logo_data)
+    for i, chunk in enumerate(slides_to_render):
+        title_suffix = " (Cont.)" if i > 0 else ""
+        create_pdf_style_slide(prs, f"Bill of Materials{title_suffix}", chunk, logo_data=logo_data)
 
-    if monthly:
-        create_pdf_style_slide(prs, "Support After Installation", monthly, logo_data=logo_data, is_monthly=True)
-
-    create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data)
+    create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data, section_subtotals=section_subtotals)
     create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign)
 
     # Shift standard closer slide back to the end
