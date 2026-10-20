@@ -285,8 +285,11 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data, section_subt
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
 
-def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None):
+def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None, custom_notes=None):
     """Generates two full-width legal disclaimer slides."""
+    if custom_notes is None:
+        custom_notes = []
+        
     if legal_terms is None:
         legal_terms = {
             "supply_chain": [
@@ -374,6 +377,11 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     tb_left = slide1.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(5.4), Inches(4.6))
     tf_left = tb_left.text_frame
     tf_left.word_wrap = True
+
+    if custom_notes:
+        add_p(tf_left, "Notes", bold=True, center=True)
+        for note in custom_notes:
+            add_p(tf_left, note)
 
     add_p(tf_left, "Supply Chain & Pricing Disclaimer", bold=True, center=True)
     for term in legal_terms.get("supply_chain", []):
@@ -537,6 +545,47 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
             if current_legal_section:
                 legal_terms[current_legal_section].append(line)
 
+    # --- Extract custom notes ---
+    custom_notes = []
+    found_acceptance_block = False
+    notes_header_found = False
+    
+    import re
+    for i in range(len(df)):
+        if len(df.iloc[i]) < 2:
+            continue
+        col1 = str(df.iloc[i, 1]).strip() if pd.notna(df.iloc[i, 1]) else ""
+        col2 = str(df.iloc[i, 2]).strip() if len(df.iloc[i]) > 2 and pd.notna(df.iloc[i, 2]) else ""
+        
+        if "Acceptance" in col1 and "Supply Chain" in col1:
+            found_acceptance_block = True
+            match = re.search(r"Acceptance\s*(.*?)\s*Supply Chain & Pricing Disclaimer", col1, re.IGNORECASE | re.DOTALL)
+            if match and match.group(1).strip():
+                note_text = match.group(1).strip()
+                if note_text.lower().startswith("notes:"):
+                    note_text = note_text[6:].strip()
+                elif note_text.lower().startswith("note:"):
+                    note_text = note_text[5:].strip()
+                if note_text:
+                    custom_notes.append(note_text)
+            continue
+            
+        if found_acceptance_block:
+            lower_col1 = col1.lower()
+            if not col1 or "authorized signature" in lower_col1 or "printed name" in lower_col1 or "title" in lower_col1 or "date" in lower_col1 or "monthly lease" in lower_col1 or "confirmation of acceptance" in lower_col1:
+                continue
+                
+            if lower_col1 == "notes" or lower_col1 == "notes:":
+                notes_header_found = True
+                if col2:
+                    custom_notes.append(col2)
+            elif lower_col1.startswith("notes:") or lower_col1.startswith("note:"):
+                custom_notes.append(col1[col1.find(":")+1:].strip())
+            elif notes_header_found:
+                custom_notes.append(col1)
+                notes_header_found = False
+    # ----------------------------
+
     sections = []
     current_section = None
     for i in range(len(df)):
@@ -625,7 +674,7 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
         create_pdf_style_slide(prs, f"Bill of Materials{title_suffix}", chunk, logo_data=logo_data)
 
     create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data, section_subtotals=section_subtotals)
-    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign, legal_terms=legal_terms)
+    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign, legal_terms=legal_terms, custom_notes=custom_notes)
 
     # Shift standard closer slide back to the end
     if orig_last_idx >= 0 and len(prs.slides) > 1:
