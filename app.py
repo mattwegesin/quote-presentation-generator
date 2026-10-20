@@ -338,14 +338,16 @@ def get_monday_quotes():
     board_id = "18424851511"
     
     query = """
-    query ($boardId: ID!, $propCode: [String]!) {
-      items_page_by_column_values(limit: 50, board_id: $boardId, columns: [{column_id: "name", column_values: $propCode}]) {
-        items {
-          id
-          name
-          column_values {
-            column { title }
-            text
+    query ($boardId: [ID!], $propCode: String!) {
+      boards(ids: $boardId) {
+        items_page(limit: 50, query_params: {rules: [{column_id: "name", compare_value: [$propCode], operator: contains_text}]}) {
+          items {
+            id
+            name
+            column_values {
+              column { title }
+              text
+            }
           }
         }
       }
@@ -362,8 +364,8 @@ def get_monday_quotes():
         resp = requests.post("https://api.monday.com/v2", headers=headers, json={
             "query": query,
             "variables": {
-                "boardId": board_id,
-                "propCode": [property_code]
+                "boardId": [board_id],
+                "propCode": property_code
             }
         })
         resp.raise_for_status()
@@ -373,7 +375,7 @@ def get_monday_quotes():
             logger.error(f"Monday API Error: {data['errors']}")
             return jsonify({"error": "Error querying Monday.com. Check server logs."}), 500
             
-        raw_items = data.get("data", {}).get("items_page_by_column_values", {}).get("items", [])
+        raw_items = data.get("data", {}).get("boards", [{}])[0].get("items_page", {}).get("items", [])
         
         formatted_items = []
         for item in raw_items:
