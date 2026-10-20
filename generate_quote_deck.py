@@ -309,24 +309,32 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         p2.font.size = Pt(24)
         p2.font.bold = True
         p2.font.color.rgb = slate_text
+        
+        # Add modern card background for the text
+        bg_shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(0.9), Inches(12.33), Inches(4.8))
+        bg_shape.fill.solid()
+        bg_shape.fill.fore_color.rgb = RGBColor(248, 250, 252) # Slate 50
+        bg_shape.line.color.rgb = RGBColor(203, 213, 225) # Slate 300
+        
         return slide
 
     def add_p(tf, text, bold=False, bullet=False):
         p = tf.add_paragraph() if tf.paragraphs[0].text else tf.paragraphs[0]
         p.text = text
         p.font.name = 'Montserrat'
-        p.font.size = Pt(11)
+        p.font.size = Pt(9.5) # Slightly smaller for a cleaner look
         p.font.bold = bold
         p.font.color.rgb = slate_text
         if bullet:
             p.level = 1
+            p.space_after = Pt(4)
         else:
-            p.space_after = Pt(10)
+            p.space_after = Pt(8)
         return p
 
     # --- SLIDE 1: Disclaimer & Caveats ---
     slide1 = setup_slide("Acceptance: Terms & Caveats")
-    tb = slide1.shapes.add_textbox(Inches(0.83), Inches(1.0), Inches(11.5), Inches(5.5))
+    tb = slide1.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(11.9), Inches(4.6))
     tf = tb.text_frame
     tf.word_wrap = True
 
@@ -346,7 +354,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
 
     # --- SLIDE 2: Disclosures ---
     slide2 = setup_slide("Acceptance: Disclosures")
-    tb2 = slide2.shapes.add_textbox(Inches(0.83), Inches(1.0), Inches(11.5), Inches(5.5))
+    tb2 = slide2.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(11.9), Inches(4.6))
     tf2 = tb2.text_frame
     tf2.word_wrap = True
 
