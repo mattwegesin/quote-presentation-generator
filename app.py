@@ -155,11 +155,36 @@ def generate():
     try:
         property_code = request.form.get("property_code", "").strip()
         monday_item_id = request.form.get("monday_item_id", "").strip()
+        monday_item_name = request.form.get("monday_item_name", "").strip()
         signer_name = request.form.get("signer_name", "").strip()
         signer_email = request.form.get("signer_email", "").strip()
         
         if not property_code or not signer_name or not signer_email:
             raise ValueError("Property Code, Signer Name, and Signer Email are required.")
+
+        # Build dynamic filename
+        import re
+        safe_excel_filename = secure_filename(quote_excel_file.filename)
+        quote_match = re.search(r'quote-(\d+)', safe_excel_filename, re.IGNORECASE)
+        quote_num = quote_match.group(1) if quote_match else "UNKNOWN"
+
+        sales_owner = ""
+        quote_date = ""
+        
+        if monday_item_name:
+            parts = [p.strip() for p in monday_item_name.split('|')]
+            if len(parts) >= 3:
+                sales_owner = parts[2]
+            if len(parts) >= 4:
+                quote_date = parts[3]
+        
+        filename_parts = [property_code, f"Proposal #{quote_num}"]
+        if sales_owner and sales_owner != "N/A":
+            filename_parts.append(sales_owner)
+        if quote_date and quote_date != "N/A":
+            filename_parts.append(quote_date)
+            
+        generated_filename = " - ".join(filename_parts) + ".pdf"
 
         # Read uploaded files directly into in-memory BytesIO buffers
         logger.info(
@@ -243,14 +268,14 @@ def generate():
         else:
             logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
 
-        logger.info("Successfully compiled proposal deck. Streaming 'Generated_Proposal.pdf' to client.")
+        logger.info(f"Successfully compiled proposal deck. Streaming '{generated_filename}' to client.")
         pdf_stream_client.seek(0)
 
         return send_file(
             pdf_stream_client,
             mimetype="application/pdf",
             as_attachment=True,
-            download_name="Generated_Proposal.pdf"
+            download_name=generated_filename
         )
 
     except Exception as exc:
