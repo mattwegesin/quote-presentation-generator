@@ -5,7 +5,8 @@ import logging
 import requests
 import tempfile
 import subprocess
-from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify
+from functools import wraps
+from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify, Response
 from werkzeug.utils import secure_filename
 from generate_quote_deck import generate_presentation
 
@@ -24,6 +25,28 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "prod-quote-deck-secret-key-
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 ALLOWED_PPTX_EXTENSIONS = {".pptx"}
 ALLOWED_EXCEL_EXTENSIONS = {".xlsx", ".xls"}
+
+def check_auth(username, password):
+    """This function is called to check if a username / password combination is valid."""
+    expected_user = os.environ.get("APP_USERNAME", "admin")
+    expected_pass = os.environ.get("APP_PASSWORD", "password")
+    return username == expected_user and password == expected_pass
+
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return Response(
+        'Could not verify your access level for that URL.\n'
+        'You have to login with proper credentials', 401,
+        {'WWW-Authenticate': 'Basic realm="Login Required"'})
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
 
 def has_allowed_extension(filename, allowed_extensions):
     if not filename or "." not in filename:
@@ -61,11 +84,13 @@ def convert_pptx_to_pdf(pptx_stream):
     return io.BytesIO(pdf_data)
 
 @app.route("/", methods=["GET"])
+@requires_auth
 def index():
     """Serves the main presentation upload interface."""
     return render_template("index.html")
 
 @app.route("/generate", methods=["POST"])
+@requires_auth
 def generate():
     """
     Handles presentation generation:
@@ -275,6 +300,7 @@ def sign_document(property_code):
     return "Error generating signature link.", 500
 
 @app.route("/api/debug/columns", methods=["GET"])
+@requires_auth
 def debug_columns():
     monday_token = os.environ.get("MONDAY_API_TOKEN")
     board_id = "18424851511"
@@ -284,6 +310,7 @@ def debug_columns():
     return jsonify(resp.json())
 
 @app.route("/api/get_monday_quotes", methods=["POST"])
+@requires_auth
 def get_monday_quotes():
     property_code = request.form.get("property_code", "").strip()
     if not property_code:
