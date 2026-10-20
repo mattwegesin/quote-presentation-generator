@@ -285,8 +285,36 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data, section_subt
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
 
-def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False):
+def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None):
     """Generates two full-width legal disclaimer slides."""
+    if legal_terms is None:
+        legal_terms = {
+            "supply_chain": [
+                "Due to ongoing global supply constraints affecting RAM and related electronic components, product availability, pricing, and delivery timelines may change without notice. All quotes and pricing are based on current supplier costs and component availability at the time issued.",
+                "Hospitality Technologies reserves the right to adjust pricing, revise delivery schedules, or substitute equivalent components if manufacturer pricing, allocations, or supply conditions change prior to order fulfillment. Hospitality Technologies shall not be held liable for shortages, backorders, delays, or price increases resulting from RAM supply constraints or other upstream component availability issues.",
+                "Acceptance of a quote, purchase order, or invoice acknowledges these potential supply chain conditions."
+            ],
+            "caveats": [
+                "Any applicable License fees will be prorated according to each individual hotel's billing agreement and payment history with Insight.",
+                "Any access holes needed, in order to run Cat6 Ethernet wiring, are to be approved in advance by the customer.",
+                "It is the responsibility of the hotel to obtain approval from your particular Brand or any Owning Partners for any wire molding, access panels or access point enclosures that may be provided by Hospitality Technologies and its installers. If the hotel decides to forego access point enclosures so that the access points are in public view, it is their responsibility to obtain approval from their Brand or any Owning Partners.",
+                "Drywall and paint repairs are to be performed by the customer as needed unless otherwise discussed in writing.",
+                "Existing Cat5e Ethernet may be re-used throughout as needed provided they meet with our end to end cable testing.",
+                "Any electrical drops needed for a power source in the MDF and IDFs are to be completed by the customer before the install is scheduled.",
+                "Upon completion of installation, if quoted, Hospitality Technologies will provide a final heatmap to ensure -65dBm signal strength throughout as required by the latest Industry Standards."
+            ],
+            "disclosures": [
+                "This proposal is hereby accepted and Hospitality Technologies is hereby authorized to proceed with work, contingent upon credit approval by Hospitality Technologies and receiving 80% down payment (not necessary with Lease Option). The final 20% is due no later than 10 days after completion. All orders received which are $5000.00 or less will be paid in full. If this quote is an equipment or license-only purchase, 100% of the total quoted is due upon acceptance. All credit card transactions are subject to a 5% processing fee.",
+                "In the event that there are unforeseen circumstances which require extra equipment to be installed, Hospitality Technologies reserves the right to change the final quoted amount based on the extra equipment and/or labor required to install said equipment.",
+                "License fees shown are estimated. Actual fees will be prorated from date of installation.",
+                "Any required lodging shall be provided by the customer unless otherwise stated in advance.",
+                "This installation is based on a single visit. If multiple visits are required, Hospitality Technologies will charge additional fees for travel on the final invoice.",
+                "IPTV requires additional equipment. If customer chooses to add IPTV after the quote is completed a change order will be required for additional equipment and labor costs.",
+                "It is further understood that acceptance of this proposal includes acceptance of all the attached terms, conditions and monthly charges. The total price listed includes all shipping and handling charges, but does not include any applicable state, local or national sales taxes. These additional state, local or national sales taxes will be included, as required, upon final billing. Any required lodging shall be provided by the customer unless otherwise stated in advance. Please sign and date all pages of the quote.",
+                "* Monthly Lease Price is contingent on approved financing."
+            ]
+        }
+
     slate_text = RGBColor.from_string('0F172A')
     red_text = RGBColor.from_string('BE123C')
 
@@ -348,22 +376,16 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     tf_left.word_wrap = True
 
     add_p(tf_left, "Supply Chain & Pricing Disclaimer", bold=True, center=True)
-    add_p(tf_left, "Due to ongoing global supply constraints affecting RAM and related electronic components, product availability, pricing, and delivery timelines may change without notice. All quotes and pricing are based on current supplier costs and component availability at the time issued.")
-    add_p(tf_left, "Hospitality Technologies reserves the right to adjust pricing, revise delivery schedules, or substitute equivalent components if manufacturer pricing, allocations, or supply conditions change prior to order fulfillment. Hospitality Technologies shall not be held liable for shortages, backorders, delays, or price increases resulting from RAM supply constraints or other upstream component availability issues.")
-    add_p(tf_left, "Acceptance of a quote, purchase order, or invoice acknowledges these potential supply chain conditions.")
+    for term in legal_terms.get("supply_chain", []):
+        add_p(tf_left, term)
 
     tb_right = slide1.shapes.add_textbox(Inches(6.6), Inches(1.0), Inches(5.9), Inches(4.6))
     tf_right = tb_right.text_frame
     tf_right.word_wrap = True
 
     add_p(tf_right, "Caveats", bold=True, center=True)
-    add_p(tf_right, "Any applicable License fees will be prorated according to each individual hotel's billing agreement and payment history with Insight.", bullet=True)
-    add_p(tf_right, "Any access holes needed, in order to run Cat6 Ethernet wiring, are to be approved in advance by the customer.", bullet=True)
-    add_p(tf_right, "It is the responsibility of the hotel to obtain approval from your particular Brand or any Owning Partners for any wire molding, access panels or access point enclosures that may be provided by Hospitality Technologies and its installers. If the hotel decides to forego access point enclosures so that the access points are in public view, it is their responsibility to obtain approval from their Brand or any Owning Partners.", bullet=True)
-    add_p(tf_right, "Drywall and paint repairs are to be performed by the customer as needed unless otherwise discussed in writing.", bullet=True)
-    add_p(tf_right, "Existing Cat5e Ethernet may be re-used throughout as needed provided they meet with our end to end cable testing.", bullet=True)
-    add_p(tf_right, "Any electrical drops needed for a power source in the MDF and IDFs are to be completed by the customer before the install is scheduled.", bullet=True)
-    add_p(tf_right, "Upon completion of installation, if quoted, Hospitality Technologies will provide a final heatmap to ensure -65dBm signal strength throughout as required by the latest Industry Standards.", bullet=True)
+    for term in legal_terms.get("caveats", []):
+        add_p(tf_right, term, bullet=True)
 
     # --- SLIDE 2: Disclosures ---
     slide2 = setup_slide("Acceptance: Disclosures")
@@ -374,25 +396,32 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     div2.fill.fore_color.rgb = RGBColor(203, 213, 225)
     div2.line.color.rgb = RGBColor(203, 213, 225)
 
+    # Split disclosures roughly in half
+    disclosures = legal_terms.get("disclosures", [])
+    midpoint = len(disclosures) // 2 + 1 if len(disclosures) > 4 else len(disclosures)
+    
+    disc_left = disclosures[:midpoint]
+    disc_right = disclosures[midpoint:]
+
     tb2_left = slide2.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(5.4), Inches(4.6))
     tf2_left = tb2_left.text_frame
     tf2_left.word_wrap = True
 
     add_p(tf2_left, "Disclosures", bold=True, center=True)
-    add_p(tf2_left, "This proposal is hereby accepted and Hospitality Technologies is hereby authorized to proceed with work, contingent upon credit approval by Hospitality Technologies and receiving 80% down payment (not necessary with Lease Option). The final 20% is due no later than 10 days after completion. All orders received which are $5000.00 or less will be paid in full. If this quote is an equipment or license-only purchase, 100% of the total quoted is due upon acceptance. All credit card transactions are subject to a 5% processing fee.", bullet=True)
-    add_p(tf2_left, "In the event that there are unforeseen circumstances which require extra equipment to be installed, Hospitality Technologies reserves the right to change the final quoted amount based on the extra equipment and/or labor required to install said equipment.", bullet=True)
-    add_p(tf2_left, "License fees shown are estimated. Actual fees will be prorated from date of installation.", bullet=True)
-    add_p(tf2_left, "Any required lodging shall be provided by the customer unless otherwise stated in advance.", bullet=True)
+    for term in disc_left:
+        add_p(tf2_left, term, bullet=True)
 
     tb2_right = slide2.shapes.add_textbox(Inches(6.6), Inches(1.0), Inches(5.9), Inches(4.6))
     tf2_right = tb2_right.text_frame
     tf2_right.word_wrap = True
     
     add_p(tf2_right, "Disclosures (Continued)", bold=True, center=True)
-    add_p(tf2_right, "This installation is based on a single visit. If multiple visits are required, Hospitality Technologies will charge additional fees for travel on the final invoice.", bullet=True)
-    add_p(tf2_right, "IPTV requires additional equipment. If customer chooses to add IPTV after the quote is completed a change order will be required for additional equipment and labor costs.", bullet=True)
-    add_p(tf2_right, "It is further understood that acceptance of this proposal includes acceptance of all the attached terms, conditions and monthly charges. The total price listed includes all shipping and handling charges, but does not include any applicable state, local or national sales taxes. These additional state, local or national sales taxes will be included, as required, upon final billing. Any required lodging shall be provided by the customer unless otherwise stated in advance. Please sign and date all pages of the quote.", bullet=True)
-    add_p(tf2_right, "* Monthly Lease Price is contingent on approved financing.", bold=True)
+    for term in disc_right:
+        if "*" in term and not term.startswith("Any") and not term.startswith("This") and not term.startswith("IPTV") and not term.startswith("It is"):
+            # If it's a bold asterisk footer note, render it bold and without a bullet
+            add_p(tf2_right, term, bold=True)
+        else:
+            add_p(tf2_right, term, bullet=True)
 
     if property_code:
         button_width = Inches(5.0)
@@ -471,6 +500,42 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
                 break
 
     df = pd.read_excel(excel_source, sheet_name=0)
+
+    # Extract dynamic acceptance verbiage from the Excel file
+    legal_terms = None
+    acceptance_text = ""
+    for col in df.columns:
+        mask = df[col].astype(str).str.contains('Supply Chain & Pricing Disclaimer', na=False)
+        if mask.any():
+            acceptance_text = df[mask][col].values[0]
+            break
+            
+    if acceptance_text:
+        legal_terms = {
+            "supply_chain": [],
+            "caveats": [],
+            "disclosures": []
+        }
+        current_legal_section = None
+        for line in acceptance_text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            if line.lower().startswith("acceptance"):
+                continue
+            
+            if "Supply Chain & Pricing Disclaimer" in line:
+                current_legal_section = "supply_chain"
+                continue
+            elif "Caveats:" in line:
+                current_legal_section = "caveats"
+                continue
+            elif "Disclosures:" in line:
+                current_legal_section = "disclosures"
+                continue
+                
+            if current_legal_section:
+                legal_terms[current_legal_section].append(line)
 
     sections = []
     current_section = None
@@ -560,7 +625,7 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
         create_pdf_style_slide(prs, f"Bill of Materials{title_suffix}", chunk, logo_data=logo_data)
 
     create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data, section_subtotals=section_subtotals)
-    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign)
+    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign, legal_terms=legal_terms)
 
     # Shift standard closer slide back to the end
     if orig_last_idx >= 0 and len(prs.slides) > 1:
