@@ -28,6 +28,21 @@ ALLOWED_EXCEL_EXTENSIONS = {".xlsx", ".xls"}
 
 def check_auth(username, password):
     """This function is called to check if a username / password combination is valid."""
+    # Attempt to load a dictionary of users from the APP_USERS environment variable
+    app_users_str = os.environ.get("APP_USERS")
+    
+    if app_users_str:
+        try:
+            # Expecting format: {"matt": "pass123", "john": "pass456"}
+            users_dict = json.loads(app_users_str)
+            if username in users_dict:
+                return users_dict[username] == password
+            return False
+        except json.JSONDecodeError:
+            logger.error("APP_USERS environment variable is not valid JSON.")
+            return False
+            
+    # Fallback to single-user mode if APP_USERS is not set
     expected_user = os.environ.get("APP_USERNAME", "admin")
     expected_pass = os.environ.get("APP_PASSWORD", "password")
     return username == expected_user and password == expected_pass
