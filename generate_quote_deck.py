@@ -581,6 +581,13 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
                     custom_notes.append(col2)
             elif lower_col1.startswith("notes:") or lower_col1.startswith("note:"):
                 custom_notes.append(col1[col1.find(":")+1:].strip())
+            elif lower_col1.startswith("notes\n") or lower_col1.startswith("note\n") or lower_col1.startswith("notes\r") or lower_col1.startswith("note\r"):
+                # Handle cases where "Notes" and the actual note are on different lines within the same cell
+                lines = re.split(r'\r?\n', col1, maxsplit=1)
+                if len(lines) > 1 and lines[1].strip():
+                    for line in lines[1].split('\n'):
+                        if line.strip():
+                            custom_notes.append(line.strip())
             elif notes_header_found:
                 custom_notes.append(col1)
                 notes_header_found = False
