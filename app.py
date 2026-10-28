@@ -164,19 +164,18 @@ def generate():
 
         # Build dynamic filename
         import re
+        from datetime import datetime
         safe_excel_filename = secure_filename(quote_excel_file.filename)
         quote_match = re.search(r'quote-(\d+)', safe_excel_filename, re.IGNORECASE)
         quote_num = quote_match.group(1) if quote_match else "UNKNOWN"
 
         sales_owner = ""
-        quote_date = ""
+        quote_date = datetime.now().strftime("%Y-%m-%d")
         
         if monday_item_name:
             parts = [p.strip() for p in monday_item_name.split('|')]
             if len(parts) >= 3:
                 sales_owner = parts[2]
-            if len(parts) >= 4:
-                quote_date = parts[3]
         
         filename_parts = [property_code, f"Proposal #{quote_num}"]
         if sales_owner and sales_owner != "N/A":
