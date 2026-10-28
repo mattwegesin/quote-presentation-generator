@@ -197,7 +197,7 @@ def generate():
         # ---------------------------------------------------------
         # GENERATE FOR BOLDSIGN (No CTA Button, Has Signature Lines)
         # ---------------------------------------------------------
-        output_stream_bs, target_page = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True)
+        output_stream_bs, target_page = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True, signer_name=signer_name)
         output_stream_bs.seek(0)
         pdf_stream_bs = convert_pptx_to_pdf(output_stream_bs)
 
@@ -206,7 +206,7 @@ def generate():
         # ---------------------------------------------------------
         pptx_stream.seek(0)
         excel_stream.seek(0)
-        output_stream_client, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False)
+        output_stream_client, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name)
         output_stream_client.seek(0)
         pdf_stream_client = convert_pptx_to_pdf(output_stream_client)
 

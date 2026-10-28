@@ -285,7 +285,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data, section_subt
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
 
-def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None, custom_notes=None):
+def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None, custom_notes=None, signer_name=None):
     """Generates two full-width legal disclaimer slides."""
     if custom_notes is None:
         custom_notes = []
@@ -450,6 +450,16 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             r_sig.font.size = Pt(14)
             r_sig.font.color.rgb = slate_text
             p_sig.alignment = PP_ALIGN.LEFT
+            
+            if signer_name:
+                name_tb = slide2.shapes.add_textbox(Inches(3.3), Inches(6.5), Inches(4.0), Inches(0.4))
+                p_name = name_tb.text_frame.paragraphs[0]
+                r_name = p_name.add_run()
+                r_name.text = signer_name
+                r_name.font.name = 'Montserrat'
+                r_name.font.size = Pt(12)
+                r_name.font.color.rgb = slate_text
+                p_name.alignment = PP_ALIGN.LEFT
         else:
             # 1. Add the modern CTA Button Image
             btn_image_stream = create_cta_button_image()
@@ -459,7 +469,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             link_url = f"https://quotepresentation.hospitalitytechnologies.com/sign/{property_code}"
             cta_pic.click_action.hyperlink.address = link_url
 
-def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False):
+def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False, signer_name=None):
     """
     Generates the presentation deck by extracting quote figures from an Excel workbook
     and injecting formatted slides into a base PowerPoint presentation.
@@ -678,10 +688,11 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
     # Slide Generation Sequence
     for i, chunk in enumerate(slides_to_render):
         title_suffix = " (Cont.)" if i > 0 else ""
-        create_pdf_style_slide(prs, f"Bill of Materials{title_suffix}", chunk, logo_data=logo_data)
+        bom_title = f"Bill of Materials - {property_code}{title_suffix}" if property_code else f"Bill of Materials{title_suffix}"
+        create_pdf_style_slide(prs, bom_title, chunk, logo_data=logo_data)
 
     create_summary_cards_slide(prs, grand_total, monthly_total, logo_data=logo_data, section_subtotals=section_subtotals)
-    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign, legal_terms=legal_terms, custom_notes=custom_notes)
+    create_acceptance_slides(prs, logo_data=logo_data, property_code=property_code, for_boldsign=for_boldsign, legal_terms=legal_terms, custom_notes=custom_notes, signer_name=signer_name)
 
     # Shift standard closer slide back to the end
     if orig_last_idx >= 0 and len(prs.slides) > 1:
