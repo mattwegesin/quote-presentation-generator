@@ -237,8 +237,7 @@ def generate():
             'Signers[0][name]': signer_name,
             'Signers[0][emailAddress]': signer_email,
             'Signers[0][signerType]': 'Signer',
-            'Signers[0][recipientNotificationSettings][signatureRequest]': 'false',
-            'CC[0][emailAddress]': 'contracts@hospitalitytechnologies.com'
+            'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
         }
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
