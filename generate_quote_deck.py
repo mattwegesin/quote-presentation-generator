@@ -456,7 +456,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
 
             # 2. Apply hyperlink directly to the image object
-            link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
+            link_url = f"https://quotepresentation.hospitalitytechnologies.com/sign/{property_code}"
             cta_pic.click_action.hyperlink.address = link_url
 
 def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False):
