@@ -336,7 +336,7 @@ def generate():
                 
             gsa_data = {
                 'Title': gsa_title_str,
-                'ExpiryDays': '14',
+                'ExpiryDays': '180',
                 'Signers[0][name]': signer_name,
                 'Signers[0][emailAddress]': signer_email,
                 'Signers[0][signerType]': 'Signer',
