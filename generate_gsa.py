@@ -56,7 +56,7 @@ def generate_gsa_pdf(template_path, hotel_name, address, notes, property_code, f
                                  
         # Add Hyperlink pointing to the exact same Render gateway used by the quote deck
         # Note: If running locally, this points to production. It routes via property_code.
-        link_url = f"https://quote-presentation-generator.onrender.com/sign/{property_code}"
+        link_url = f"https://quote-presentation-generator.onrender.com/sign_gsa/{property_code}"
         last_page.insert_link({"kind": fitz.LINK_URI, "from": btn_rect, "uri": link_url})
         
     output_stream = io.BytesIO()

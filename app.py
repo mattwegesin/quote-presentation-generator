@@ -232,21 +232,16 @@ def generate():
         }
 
         # Initialize the file list with the Proposal
-        files = [
+        proposal_files = [
             ('Files', ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf'))
         ]
         pdf_stream_bs.seek(0)
         
-        # Calculate base proposal pages to offset any GSA signature fields
-        import fitz
-        base_proposal_doc = fitz.open(stream=pdf_stream_bs.read(), filetype="pdf")
-        proposal_pages_count = len(base_proposal_doc)
-        pdf_stream_bs.seek(0)
-
         # ---------------------------------------------------------
         # GENERATE GSA LOCALLY IF REQUESTED
         # ---------------------------------------------------------
         gsa_client_stream = None
+        gsa_bs_stream = None
         if generate_gsa:
             logger.info(f"GSA generation requested for {property_code}. Fetching Monday.com details.")
             hotel_name = property_code
@@ -291,16 +286,18 @@ def generate():
             
             # Generate GSA for BoldSign (No CTA Button)
             gsa_bs_stream = generate_gsa_pdf(template_path, hotel_name, address, gsa_notes, property_code, for_boldsign=True)
-            files.append(('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf')))
             
             # Generate GSA for Client (Has CTA Button)
             gsa_client_stream = generate_gsa_pdf(template_path, hotel_name, address, gsa_notes, property_code, for_boldsign=False)
 
+        # ---------------------------------------------------------
+        # SEND PROPOSAL TO BOLDSIGN
+        # ---------------------------------------------------------
         title_str = f"Hospitality Technologies Agreement - {property_code}"
         if monday_item_id:
             title_str += f" | ID:{monday_item_id}"
 
-        data = {
+        proposal_data = {
             'Title': title_str,
             'ExpiryDays': '14',
             'Signers[0][name]': signer_name,
@@ -309,41 +306,65 @@ def generate():
             'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
         }
 
-        form_field_index = 0
         # Inject exact coordinates for the Proposal Signature Block
         if target_page:
-            data.update({
-                f'Signers[0][formFields][{form_field_index}][id]': 'proposal_signature',
-                f'Signers[0][formFields][{form_field_index}][fieldType]': 'Signature',
-                f'Signers[0][formFields][{form_field_index}][pageNumber]': str(target_page),
-                f'Signers[0][formFields][{form_field_index}][bounds][x]': '344',
-                f'Signers[0][formFields][{form_field_index}][bounds][y]': '584',
-                f'Signers[0][formFields][{form_field_index}][bounds][width]': '214',
-                f'Signers[0][formFields][{form_field_index}][bounds][height]': '30',
-                f'Signers[0][formFields][{form_field_index}][isRequired]': 'true'
-            })
-            form_field_index += 1
-            
-        # Inject exact coordinates for the GSA Signature Block (Appended after proposal)
-        if generate_gsa:
-            gsa_signature_page = proposal_pages_count + 12 # Page 12 of the GSA
-            data.update({
-                f'Signers[0][formFields][{form_field_index}][id]': 'gsa_signature',
-                f'Signers[0][formFields][{form_field_index}][fieldType]': 'Signature',
-                f'Signers[0][formFields][{form_field_index}][pageNumber]': str(gsa_signature_page),
-                f'Signers[0][formFields][{form_field_index}][bounds][x]': '344',
-                f'Signers[0][formFields][{form_field_index}][bounds][y]': '630', # Placed below the notes
-                f'Signers[0][formFields][{form_field_index}][bounds][width]': '214',
-                f'Signers[0][formFields][{form_field_index}][bounds][height]': '30',
-                f'Signers[0][formFields][{form_field_index}][isRequired]': 'true'
+            proposal_data.update({
+                f'Signers[0][formFields][0][id]': 'proposal_signature',
+                f'Signers[0][formFields][0][fieldType]': 'Signature',
+                f'Signers[0][formFields][0][pageNumber]': str(target_page),
+                f'Signers[0][formFields][0][bounds][x]': '344',
+                f'Signers[0][formFields][0][bounds][y]': '584',
+                f'Signers[0][formFields][0][bounds][width]': '214',
+                f'Signers[0][formFields][0][bounds][height]': '30',
+                f'Signers[0][formFields][0][isRequired]': 'true'
             })
 
-        resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
-        if resp.status_code not in (200, 201):
-            logger.error(f"BoldSign API Error: {resp.status_code} - {resp.text}")
-            raise RuntimeError(f"Failed to create BoldSign document: {resp.text}")
+        resp_prop = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=proposal_data, files=proposal_files)
+        if resp_prop.status_code not in (200, 201):
+            logger.error(f"BoldSign Proposal API Error: {resp_prop.status_code} - {resp_prop.text}")
+            raise RuntimeError(f"Failed to create BoldSign Proposal document: {resp_prop.text}")
         else:
-            logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
+            logger.info(f"Successfully created BoldSign Proposal document: {resp_prop.json().get('documentId')}")
+
+        # ---------------------------------------------------------
+        # SEND GSA TO BOLDSIGN (IF REQUESTED)
+        # ---------------------------------------------------------
+        if generate_gsa and gsa_bs_stream:
+            gsa_title_str = f"Guest Service Agreement - {property_code}"
+            if monday_item_id:
+                gsa_title_str += f" | ID:{monday_item_id}"
+                
+            gsa_data = {
+                'Title': gsa_title_str,
+                'ExpiryDays': '14',
+                'Signers[0][name]': signer_name,
+                'Signers[0][emailAddress]': signer_email,
+                'Signers[0][signerType]': 'Signer',
+                'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
+            }
+            
+            # GSA signature is on page 12 of the independent GSA document
+            gsa_data.update({
+                f'Signers[0][formFields][0][id]': 'gsa_signature',
+                f'Signers[0][formFields][0][fieldType]': 'Signature',
+                f'Signers[0][formFields][0][pageNumber]': '12',
+                f'Signers[0][formFields][0][bounds][x]': '344',
+                f'Signers[0][formFields][0][bounds][y]': '630',
+                f'Signers[0][formFields][0][bounds][width]': '214',
+                f'Signers[0][formFields][0][bounds][height]': '30',
+                f'Signers[0][formFields][0][isRequired]': 'true'
+            })
+            
+            gsa_files = [
+                ('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf'))
+            ]
+            
+            resp_gsa = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=gsa_data, files=gsa_files)
+            if resp_gsa.status_code not in (200, 201):
+                logger.error(f"BoldSign GSA API Error: {resp_gsa.status_code} - {resp_gsa.text}")
+                # We won't crash the whole generator if just the GSA fails, but we log it
+            else:
+                logger.info(f"Successfully created BoldSign GSA document: {resp_gsa.json().get('documentId')}")
 
         logger.info(f"Successfully compiled documents. Preparing download stream.")
         pdf_stream_client.seek(0)
@@ -457,6 +478,59 @@ def sign_document(property_code):
 
     if not target_doc:
         return "No active document found for signing. It may have expired.", 404
+        
+    document_id = target_doc.get("documentId")
+    try:
+        signer_email = target_doc.get("signerDetails")[0].get("signerEmail")
+    except (TypeError, IndexError, KeyError):
+        return "Signer details could not be parsed from BoldSign.", 500
+    
+    # Get Embedded Sign Link
+    link_url = f"https://api.boldsign.com/v1/document/getEmbeddedSignLink?documentId={document_id}&signerEmail={signer_email}"
+    link_resp = requests.get(link_url, headers=headers)
+    if link_resp.status_code != 200:
+        return f"Failed to generate signing link: {link_resp.text}", 500
+        
+    sign_link = link_resp.json().get("signLink")
+    if sign_link:
+        # Redirect client directly into the signing interface
+        return redirect(sign_link)
+    
+    return "Error generating signature link.", 500
+
+@app.route("/sign_gsa/<property_code>", methods=["GET"])
+def sign_gsa_document(property_code):
+    """Dynamic gateway redirecting to BoldSign embedded signing link specifically for the GSA."""
+    boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+    if not boldsign_api_key:
+        return "BoldSign integration not configured.", 500
+        
+    headers = {
+        'X-API-KEY': boldsign_api_key,
+        'Accept': 'application/json'
+    }
+    
+    # Search for the document by title
+    search_url = f"https://api.boldsign.com/v1/document/list?searchQuery={property_code}&pageSize=10"
+    resp = requests.get(search_url, headers=headers)
+    if resp.status_code != 200:
+        return "Failed to search BoldSign documents.", 500
+        
+    data = resp.json()
+    docs = data.get("result", [])
+    if not docs:
+        return "Document not found or has expired.", 404
+        
+    # Find the most recent matching document for the GSA
+    target_doc = None
+    target_title_prefix = f"Guest Service Agreement - {property_code}"
+    for doc in docs:
+        if doc.get("messageTitle", "").startswith(target_title_prefix) and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
+            target_doc = doc
+            break
+
+    if not target_doc:
+        return "No active GSA document found for signing. It may have expired.", 404
         
     document_id = target_doc.get("documentId")
     try:
