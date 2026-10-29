@@ -183,7 +183,7 @@ def generate():
         if quote_date and quote_date != "N/A":
             filename_parts.append(quote_date)
             
-        generate_filename = " - ".join(filename_parts) + ".pdf"
+        generated_filename = " - ".join(filename_parts) + ".pdf"
 
         # Check if GSA generation is requested
         generate_gsa = request.form.get("generate_gsa", "false").lower() == "true"
