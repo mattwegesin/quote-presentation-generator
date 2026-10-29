@@ -231,9 +231,70 @@ def generate():
             'Accept': 'application/json'
         }
 
-        files = {
-            'Files': ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf')
-        }
+        # Initialize the file list with the Proposal
+        files = [
+            ('Files', ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf'))
+        ]
+        pdf_stream_bs.seek(0)
+        
+        # Calculate base proposal pages to offset any GSA signature fields
+        import fitz
+        base_proposal_doc = fitz.open(stream=pdf_stream_bs.read(), filetype="pdf")
+        proposal_pages_count = len(base_proposal_doc)
+        pdf_stream_bs.seek(0)
+
+        # ---------------------------------------------------------
+        # GENERATE GSA LOCALLY IF REQUESTED
+        # ---------------------------------------------------------
+        gsa_client_stream = None
+        if generate_gsa:
+            logger.info(f"GSA generation requested for {property_code}. Fetching Monday.com details.")
+            hotel_name = property_code
+            address = ""
+            
+            # Fetch Monday details
+            if monday_item_id:
+                monday_token = os.environ.get("MONDAY_API_TOKEN")
+                if monday_token:
+                    monday_headers = {
+                        "Authorization": monday_token, 
+                        "API-Version": "2024-01", 
+                        "Content-Type": "application/json"
+                    }
+                    query = """
+                    query ($itemId: [ID!]) {
+                      items(ids: $itemId) {
+                        column_values {
+                          column { title }
+                          text
+                        }
+                      }
+                    }
+                    """
+                    try:
+                        item_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": query, "variables": {"itemId": [monday_item_id]}
+                        })
+                        if item_resp.status_code == 200:
+                            cols = item_resp.json().get("data", {}).get("items", [{}])[0].get("column_values", [])
+                            for col in cols:
+                                title = col.get("column", {}).get("title")
+                                if title == "Hotel Name" and col.get("text"):
+                                    hotel_name = col.get("text")
+                                elif title == "Property Address" and col.get("text"):
+                                    address = col.get("text")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch Monday details for GSA: {e}")
+
+            from generate_gsa import generate_gsa_pdf
+            template_path = os.path.join(os.path.dirname(__file__), "Hospitality_Technologies_Guest_Support_Agreement_Completed.pdf")
+            
+            # Generate GSA for BoldSign (No CTA Button)
+            gsa_bs_stream = generate_gsa_pdf(template_path, hotel_name, address, gsa_notes, property_code, for_boldsign=True)
+            files.append(('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf')))
+            
+            # Generate GSA for Client (Has CTA Button)
+            gsa_client_stream = generate_gsa_pdf(template_path, hotel_name, address, gsa_notes, property_code, for_boldsign=False)
 
         title_str = f"Hospitality Technologies Agreement - {property_code}"
         if monday_item_id:
@@ -248,17 +309,33 @@ def generate():
             'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
         }
 
-        # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
+        form_field_index = 0
+        # Inject exact coordinates for the Proposal Signature Block
         if target_page:
             data.update({
-                'Signers[0][formFields][0][id]': 'signature_block',
-                'Signers[0][formFields][0][fieldType]': 'Signature',
-                'Signers[0][formFields][0][pageNumber]': str(target_page),
-                'Signers[0][formFields][0][bounds][x]': '344',
-                'Signers[0][formFields][0][bounds][y]': '584',
-                'Signers[0][formFields][0][bounds][width]': '214',
-                'Signers[0][formFields][0][bounds][height]': '30',
-                'Signers[0][formFields][0][isRequired]': 'true'
+                f'Signers[0][formFields][{form_field_index}][id]': 'proposal_signature',
+                f'Signers[0][formFields][{form_field_index}][fieldType]': 'Signature',
+                f'Signers[0][formFields][{form_field_index}][pageNumber]': str(target_page),
+                f'Signers[0][formFields][{form_field_index}][bounds][x]': '344',
+                f'Signers[0][formFields][{form_field_index}][bounds][y]': '584',
+                f'Signers[0][formFields][{form_field_index}][bounds][width]': '214',
+                f'Signers[0][formFields][{form_field_index}][bounds][height]': '30',
+                f'Signers[0][formFields][{form_field_index}][isRequired]': 'true'
+            })
+            form_field_index += 1
+            
+        # Inject exact coordinates for the GSA Signature Block (Appended after proposal)
+        if generate_gsa:
+            gsa_signature_page = proposal_pages_count + 12 # Page 12 of the GSA
+            data.update({
+                f'Signers[0][formFields][{form_field_index}][id]': 'gsa_signature',
+                f'Signers[0][formFields][{form_field_index}][fieldType]': 'Signature',
+                f'Signers[0][formFields][{form_field_index}][pageNumber]': str(gsa_signature_page),
+                f'Signers[0][formFields][{form_field_index}][bounds][x]': '344',
+                f'Signers[0][formFields][{form_field_index}][bounds][y]': '630', # Placed below the notes
+                f'Signers[0][formFields][{form_field_index}][bounds][width]': '214',
+                f'Signers[0][formFields][{form_field_index}][bounds][height]': '30',
+                f'Signers[0][formFields][{form_field_index}][isRequired]': 'true'
             })
 
         resp = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=data, files=files)
@@ -268,54 +345,25 @@ def generate():
         else:
             logger.info(f"Successfully created BoldSign document: {resp.json().get('documentId')}")
 
-        logger.info(f"Successfully compiled proposal deck. Streaming '{generated_filename}' to client.")
+        logger.info(f"Successfully compiled documents. Preparing download stream.")
         pdf_stream_client.seek(0)
 
-        # Generate GSA if requested
-        if generate_gsa:
-            logger.info(f"GSA generation requested for {property_code}")
-            gsa_template_id = os.environ.get("BOLDSIGN_GSA_TEMPLATE_ID", "replace-with-actual-id")
+        if generate_gsa and gsa_client_stream:
+            import zipfile
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(generated_filename, pdf_stream_client.read())
+                zf.writestr(f"GSA_{property_code}.pdf", gsa_client_stream.read())
             
-            gsa_data = {
-                'Title': f"Guest Service Agreement - {property_code}",
-                'DisableEmails': 'true',
-                'Roles[0][roleIndex]': '1',
-                'Roles[0][signerName]': signer_name,
-                'Roles[0][signerEmail]': signer_email,
-            }
-            if gsa_notes:
-                gsa_data['Notes'] = gsa_notes
-                
-            gsa_resp = requests.post(f"https://api.boldsign.com/v1/template/send?templateId={gsa_template_id}", headers=headers, data=gsa_data)
-            
-            if gsa_resp.status_code in (200, 201):
-                gsa_doc_id = gsa_resp.json().get("documentId")
-                logger.info(f"Created GSA document: {gsa_doc_id}")
-                
-                # Download the GSA PDF
-                gsa_dl_resp = requests.get(f"https://api.boldsign.com/v1/document/download?documentId={gsa_doc_id}", headers=headers)
-                if gsa_dl_resp.status_code == 200:
-                    import zipfile
-                    zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                        zf.writestr(generated_filename, pdf_stream_client.getvalue())
-                        zf.writestr(f"GSA_{property_code}.pdf", gsa_dl_resp.content)
-                    
-                    zip_buffer.seek(0)
-                    zip_filename = f"Proposal_and_GSA_{property_code}.zip"
-                    return send_file(
-                        zip_buffer,
-                        mimetype="application/zip",
-                        as_attachment=True,
-                        download_name=zip_filename
-                    )
-                else:
-                    logger.error(f"Failed to download GSA document: {gsa_dl_resp.text}")
-                    # Fallback to returning just the proposal if GSA download fails
-            else:
-                logger.error(f"Failed to create GSA document: {gsa_resp.text}")
-                # Fallback to returning just the proposal if GSA creation fails
-                
+            zip_buffer.seek(0)
+            zip_filename = f"Proposal_and_GSA_{property_code}.zip"
+            return send_file(
+                zip_buffer,
+                mimetype="application/zip",
+                as_attachment=True,
+                download_name=zip_filename
+            )
+
         return send_file(
             pdf_stream_client,
             mimetype="application/pdf",
