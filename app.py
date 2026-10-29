@@ -8,7 +8,11 @@ import subprocess
 from functools import wraps
 from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify, Response
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
 from generate_quote_deck import generate_presentation
+
+# Load environment variables from .env if present
+load_dotenv()
 
 # Configure structured logging
 logging.basicConfig(
