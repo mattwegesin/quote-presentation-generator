@@ -183,7 +183,11 @@ def generate():
         if quote_date and quote_date != "N/A":
             filename_parts.append(quote_date)
             
-        generated_filename = " - ".join(filename_parts) + ".pdf"
+        generate_filename = " - ".join(filename_parts) + ".pdf"
+
+        # Check if GSA generation is requested
+        generate_gsa = request.form.get("generate_gsa", "false").lower() == "true"
+        gsa_notes = request.form.get("gsa_notes", "").strip()
 
         # Read uploaded files directly into in-memory BytesIO buffers
         logger.info(
@@ -242,13 +246,6 @@ def generate():
 
         # If a property code was provided and a target page found, inject exact coordinates for the Signature Block
         if target_page:
-            # The slide is 10.0" wide by 7.5" high in the final PDF.
-            # At 96 DPI for BoldSign, the canvas is 960px by 720px.
-            # The text box is horizontally placed exactly at X = 2.5" (180px in PDF space).
-            # The text box is vertically placed exactly at Y = 6.2" (595px in PDF space).
-            # The exact pixel widths of the text string at 14pt Helvetica were mathematically measured:
-            # Signature block starts exactly 69px after X=180 -> X=249.
-            # Date block starts exactly 367px after X=180 -> X=547.
             data.update({
                 'Signers[0][formFields][0][id]': 'signature_block',
                 'Signers[0][formFields][0][fieldType]': 'Signature',
@@ -270,6 +267,51 @@ def generate():
         logger.info(f"Successfully compiled proposal deck. Streaming '{generated_filename}' to client.")
         pdf_stream_client.seek(0)
 
+        # Generate GSA if requested
+        if generate_gsa:
+            logger.info(f"GSA generation requested for {property_code}")
+            gsa_template_id = os.environ.get("BOLDSIGN_GSA_TEMPLATE_ID", "replace-with-actual-id")
+            
+            gsa_data = {
+                'Title': f"Guest Service Agreement - {property_code}",
+                'DisableEmails': 'true',
+                'Roles[0][roleIndex]': '1',
+                'Roles[0][signerName]': signer_name,
+                'Roles[0][signerEmail]': signer_email,
+            }
+            if gsa_notes:
+                gsa_data['Notes'] = gsa_notes
+                
+            gsa_resp = requests.post(f"https://api.boldsign.com/v1/template/send?templateId={gsa_template_id}", headers=headers, data=gsa_data)
+            
+            if gsa_resp.status_code in (200, 201):
+                gsa_doc_id = gsa_resp.json().get("documentId")
+                logger.info(f"Created GSA document: {gsa_doc_id}")
+                
+                # Download the GSA PDF
+                gsa_dl_resp = requests.get(f"https://api.boldsign.com/v1/document/download?documentId={gsa_doc_id}", headers=headers)
+                if gsa_dl_resp.status_code == 200:
+                    import zipfile
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                        zf.writestr(generated_filename, pdf_stream_client.getvalue())
+                        zf.writestr(f"GSA_{property_code}.pdf", gsa_dl_resp.content)
+                    
+                    zip_buffer.seek(0)
+                    zip_filename = f"Proposal_and_GSA_{property_code}.zip"
+                    return send_file(
+                        zip_buffer,
+                        mimetype="application/zip",
+                        as_attachment=True,
+                        download_name=zip_filename
+                    )
+                else:
+                    logger.error(f"Failed to download GSA document: {gsa_dl_resp.text}")
+                    # Fallback to returning just the proposal if GSA download fails
+            else:
+                logger.error(f"Failed to create GSA document: {gsa_resp.text}")
+                # Fallback to returning just the proposal if GSA creation fails
+                
         return send_file(
             pdf_stream_client,
             mimetype="application/pdf",
@@ -284,6 +326,51 @@ def generate():
             return jsonify({"success": False, "error": err_msg}), 500
         flash(err_msg, "error")
         return redirect(url_for("index"))
+
+@app.route("/api/check_customer", methods=["POST"])
+@requires_auth
+def check_netsuite_customer():
+    """Checks NetSuite to see if a customer exists by Inn Code/Property Code."""
+    property_code = request.form.get("property_code", "").strip()
+    if not property_code:
+        return jsonify({"error": "Property code required"}), 400
+        
+    try:
+        from requests_oauthlib import OAuth1
+    except ImportError:
+        logger.error("requests_oauthlib not installed")
+        return jsonify({"error": "OAuth library missing"}), 500
+
+    account = os.environ.get("NETSUITE_ACCOUNT_ID")
+    consumer_key = os.environ.get("NETSUITE_CONSUMER_KEY")
+    consumer_secret = os.environ.get("NETSUITE_CONSUMER_SECRET")
+    token_id = os.environ.get("NETSUITE_TOKEN_ID")
+    token_secret = os.environ.get("NETSUITE_TOKEN_SECRET")
+    
+    if not all([account, consumer_key, consumer_secret, token_id, token_secret]):
+        return jsonify({"error": "NetSuite credentials missing"}), 500
+
+    realm = account.upper()
+    oauth = OAuth1(consumer_key, client_secret=consumer_secret, resource_owner_key=token_id, resource_owner_secret=token_secret, signature_method='HMAC-SHA256', realm=realm)
+    
+    url_account = account.lower().replace("_", "-")
+    url = f"https://{url_account}.suitetalk.api.netsuite.com/services/rest/query/v1/suiteql"
+    
+    # Simple SuiteQL query
+    q = f"SELECT id FROM customer WHERE UPPER(entityid) LIKE UPPER('%{property_code}%') OR UPPER(companyname) LIKE UPPER('%{property_code}%')"
+    
+    try:
+        res = requests.post(url, headers={"Prefer": "transient"}, json={"q": q}, auth=oauth)
+        if res.status_code == 200:
+            data = res.json()
+            items = data.get("items", [])
+            return jsonify({"exists": len(items) > 0, "count": len(items)})
+        else:
+            logger.error(f"NetSuite API error: {res.status_code} {res.text}")
+            return jsonify({"error": "NetSuite API error"}), 500
+    except Exception as e:
+        logger.error(f"Failed to check NetSuite: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/sign/<property_code>", methods=["GET"])
 def sign_document(property_code):

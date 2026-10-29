@@ -422,6 +422,133 @@
       font-family: var(--font-montserrat);
     }
 
+    /* Modal Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal {
+      background: #FFFFFF;
+      border-radius: var(--radius);
+      width: 90%;
+      max-width: 500px;
+      padding: 2rem;
+      box-shadow: var(--shadow-lg);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-overlay.active .modal {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    
+    .modal-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #FEF2F2;
+      color: var(--accent-red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-title {
+      font-family: var(--font-montserrat);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    .modal-body {
+      color: var(--secondary-slate);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-notes {
+      display: none;
+      margin-top: 1rem;
+    }
+
+    .modal-notes label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--primary-dark);
+    }
+
+    .modal-notes textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-family: var(--font-inter);
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background: #FFFFFF;
+      border: 1px solid var(--border-color);
+      color: var(--secondary-slate);
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #F1F5F9;
+    }
+
+    .btn-primary {
+      background: var(--primary-blue);
+      border: none;
+      color: #FFFFFF;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-blue-hover);
+    }
+
     footer {
       text-align: center;
       padding: 2rem;
@@ -473,6 +600,9 @@
       </div>
 
       <form id="deckForm" action="/generate" method="POST" enctype="multipart/form-data">
+        <input type="hidden" id="generate_gsa" name="generate_gsa" value="false">
+        <input type="hidden" id="gsa_notes" name="gsa_notes" value="">
+        
         <div class="input-list" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
           <div class="input-group">
             <label for="property_code" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Property / INN Code</label>
@@ -564,7 +694,7 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn-submit" id="btnSubmit">
+          <button type="button" class="btn-submit" id="btnSubmit">
             <span class="spinner" id="spinner"></span>
             <svg id="download-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -584,6 +714,38 @@
       </div>
     </div>
   </main>
+
+  <div class="modal-overlay" id="gsaModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <h3 class="modal-title">New Customer Detected</h3>
+      </div>
+      <div class="modal-body">
+        <p>This property (INN Code: <strong id="modalInnCode"></strong>) is not currently an active customer in NetSuite.</p>
+        <p style="margin-top: 0.75rem;">Would you like to automatically generate a Guest Service Agreement (GSA) alongside the proposal deck?</p>
+        
+        <div class="modal-notes" id="gsaNotesSection">
+          <label for="gsaNotesInput">Add specific notes for this GSA (Optional):</label>
+          <textarea id="gsaNotesInput" placeholder="e.g. Include addendum B, waiving installation fee..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" id="modalButtons1">
+        <button class="btn-secondary" id="btnGsaNo">No, Skip GSA</button>
+        <button class="btn-primary" id="btnGsaYes">Yes, Create GSA</button>
+      </div>
+      <div class="modal-footer" id="modalButtons2" style="display: none;">
+        <button class="btn-secondary" id="btnGsaCancel">Cancel</button>
+        <button class="btn-primary" id="btnGsaConfirm">Confirm & Generate</button>
+      </div>
+    </div>
+  </div>
 
   <footer>
     &copy; 2026 Hospitality Technologies. Enterprise Presentation Synthesis Engine.
@@ -670,6 +832,19 @@
     const mondayItemGroup = document.getElementById('monday_item_group');
     const mondayItemSelect = document.getElementById('monday_item_id');
     const mondayItemNameInput = document.getElementById('monday_item_name');
+    
+    const gsaModal = document.getElementById('gsaModal');
+    const modalInnCode = document.getElementById('modalInnCode');
+    const btnGsaNo = document.getElementById('btnGsaNo');
+    const btnGsaYes = document.getElementById('btnGsaYes');
+    const gsaNotesSection = document.getElementById('gsaNotesSection');
+    const modalButtons1 = document.getElementById('modalButtons1');
+    const modalButtons2 = document.getElementById('modalButtons2');
+    const btnGsaCancel = document.getElementById('btnGsaCancel');
+    const btnGsaConfirm = document.getElementById('btnGsaConfirm');
+    const gsaNotesInput = document.getElementById('gsaNotesInput');
+    const generateGsaInput = document.getElementById('generate_gsa');
+    const formGsaNotesInput = document.getElementById('gsa_notes');
 
     if (mondayItemSelect) {
       mondayItemSelect.addEventListener('change', () => {
@@ -721,7 +896,7 @@
               mondayItemSelect.appendChild(option);
             });
             mondayItemGroup.style.display = 'block';
-            flashContainer.innerHTML = ''; // clear any previous errors
+            flashContainer.innerHTML = '';
           }
         } catch (err) {
           showError(err.message);
@@ -733,17 +908,104 @@
       });
     }
 
-    form.addEventListener('submit', async (e) => {
+    function resetModal() {
+      gsaModal.classList.remove('active');
+      gsaNotesSection.style.display = 'none';
+      modalButtons1.style.display = 'flex';
+      modalButtons2.style.display = 'none';
+      gsaNotesInput.value = '';
+      generateGsaInput.value = 'false';
+      formGsaNotesInput.value = '';
+    }
+
+    btnGsaNo.addEventListener('click', (e) => {
+      e.preventDefault();
+      resetModal();
+      submitForm();
+    });
+
+    btnGsaYes.addEventListener('click', (e) => {
+      e.preventDefault();
+      gsaNotesSection.style.display = 'block';
+      modalButtons1.style.display = 'none';
+      modalButtons2.style.display = 'flex';
+    });
+
+    btnGsaCancel.addEventListener('click', (e) => {
+      e.preventDefault();
+      resetModal();
+    });
+
+    btnGsaConfirm.addEventListener('click', (e) => {
+      e.preventDefault();
+      generateGsaInput.value = 'true';
+      formGsaNotesInput.value = gsaNotesInput.value;
+      gsaModal.classList.remove('active');
+      submitForm();
+    });
+
+    btnSubmit.addEventListener('click', async (e) => {
       e.preventDefault();
       
       const pptxInput = document.getElementById('base_pptx');
       const excelInput = document.getElementById('quote_excel');
+      const propertyCode = document.getElementById('property_code').value.trim();
+
+      if (!propertyCode || !document.getElementById('signer_name').value.trim() || !document.getElementById('signer_email').value.trim()) {
+        showError("Please fill out all required fields.");
+        return;
+      }
 
       if (!pptxInput.files[0] || !excelInput.files[0]) {
         showError("Please upload both the Base Presentation (.pptx) and Quote Data (.xlsx) files.");
         return;
       }
+      
+      flashContainer.innerHTML = '';
+      btnSubmit.disabled = true;
+      spinner.style.display = 'inline-block';
+      downloadIcon.style.display = 'none';
+      btnText.textContent = "Checking Customer...";
+      
+      try {
+        // Step 1: Check NetSuite
+        const formData = new FormData();
+        formData.append('property_code', propertyCode);
+        
+        const response = await fetch('/api/check_customer', {
+          method: 'POST',
+          body: formData
+        });
 
+        if (!response.ok) {
+          // If NetSuite check fails (e.g. no creds), just proceed normally
+          console.warn("NetSuite check failed, proceeding without GSA prompt.");
+          submitForm();
+          return;
+        }
+
+        const data = await response.json();
+        
+        if (data.exists) {
+          // Customer exists, proceed normally
+          submitForm();
+        } else {
+          // Customer does NOT exist, show modal
+          btnSubmit.disabled = false;
+          spinner.style.display = 'none';
+          downloadIcon.style.display = 'inline-block';
+          btnText.textContent = "Generate Presentation";
+          
+          modalInnCode.textContent = propertyCode;
+          gsaModal.classList.add('active');
+        }
+      } catch (err) {
+        console.error("Error checking customer:", err);
+        submitForm(); // Proceed normally on network error
+      }
+    });
+
+    async function submitForm() {
       // Enter loading state
       btnSubmit.disabled = true;
       spinner.style.display = 'inline-block';
@@ -770,7 +1032,7 @@
           }
         }
 
-        let filename = 'Generated_Proposal.pdf';
+        let filename = 'Generated_Files.zip'; // default fallback
         const disposition = response.headers.get('Content-Disposition');
         if (disposition && disposition.indexOf('attachment') !== -1) {
           const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
@@ -780,7 +1042,7 @@
           }
         }
 
-        // Receive binary PPTX/PDF stream
+        // Receive binary PPTX/PDF/ZIP stream
         const blob = await response.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -791,9 +1053,10 @@
         a.remove();
         window.URL.revokeObjectURL(downloadUrl);
 
-        btnText.textContent = "Presentation Generated!";
+        btnText.textContent = "Generation Complete!";
         setTimeout(() => {
           btnText.textContent = "Generate Presentation";
+          resetModal();
         }, 3000);
       } catch (err) {
         showError(err.message);
@@ -803,7 +1066,7 @@
         downloadIcon.style.display = 'inline-block';
         progressBar.style.display = 'none';
       }
-    });
+    }
 
     function showError(message) {
       flashContainer.innerHTML = `
