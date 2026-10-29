@@ -51,7 +51,7 @@ def generate_gsa_pdf(template_path, hotel_name, address, notes, property_code, f
         
         # Add CTA Text
         last_page.insert_textbox(btn_rect, "Ready to Move Forward? Click to E-Sign", 
-                                 fontsize=12, fontname="helv-b", color=(1, 1, 1), 
+                                 fontsize=12, fontname="hebo", color=(1, 1, 1), 
                                  align=fitz.TEXT_ALIGN_CENTER)
                                  
         # Add Hyperlink pointing to the exact same Render gateway used by the quote deck
