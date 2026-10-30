@@ -406,7 +406,7 @@ def generate():
             resp_gsa = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=gsa_data, files=gsa_files)
             if resp_gsa.status_code not in (200, 201):
                 logger.error(f"BoldSign GSA API Error: {resp_gsa.status_code} - {resp_gsa.text}")
-                # We won't crash the whole generator if just the GSA fails, but we log it
+                raise RuntimeError(f"Failed to create BoldSign GSA document: {resp_gsa.text}")
             else:
                 logger.info(f"Successfully created BoldSign GSA document: {resp_gsa.json().get('documentId')}")
 
