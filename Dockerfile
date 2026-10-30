@@ -1,9 +1,11 @@
 FROM python:3.11-slim
 
-# Install LibreOffice and fonts for PPTX to PDF conversion
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Accept EULA for Microsoft Fonts and install LibreOffice and fonts for PPTX/DOCX to PDF conversion
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
+    apt-get update && apt-get install -y --no-install-recommends \
     libreoffice \
     libreoffice-writer \
+    ttf-mscorefonts-installer \
     fonts-liberation \
     fonts-dejavu \
     fonts-noto-core \
