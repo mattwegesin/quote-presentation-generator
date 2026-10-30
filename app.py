@@ -307,11 +307,11 @@ def generate():
             except (ValueError, TypeError):
                 gsa_meeting = 0.0
 
-            from generate_gsa_docx import generate_gsa_docx
+            from generate_gsa_docx import generate_gsa_docx_to_pdf
             template_path = os.path.join(os.path.dirname(__file__), "GSA_TAGS.docx")
             
-            # Generate populated DOCX
-            gsa_docx_stream = generate_gsa_docx(
+            # Generate GSA for BoldSign (No CTA Button)
+            gsa_bs_stream = generate_gsa_docx_to_pdf(
                 template_path=template_path,
                 property_code=property_code,
                 signer_name=signer_name,
@@ -322,7 +322,24 @@ def generate():
                 term=gsa_term,
                 studio=gsa_studio,
                 meeting_fee=gsa_meeting,
-                notes=gsa_notes
+                notes=gsa_notes,
+                for_boldsign=True
+            )
+            
+            # Generate GSA for Client (Has CTA Button)
+            gsa_client_stream = generate_gsa_docx_to_pdf(
+                template_path=template_path,
+                property_code=property_code,
+                signer_name=signer_name,
+                signer_email=signer_email,
+                hotel_name=hotel_name,
+                address=address,
+                room_count=room_count,
+                term=gsa_term,
+                studio=gsa_studio,
+                meeting_fee=gsa_meeting,
+                notes=gsa_notes,
+                for_boldsign=False
             )
 
         # ---------------------------------------------------------
@@ -364,7 +381,7 @@ def generate():
         # ---------------------------------------------------------
         # SEND GSA TO BOLDSIGN (IF REQUESTED)
         # ---------------------------------------------------------
-        if generate_gsa and gsa_docx_stream:
+        if generate_gsa and gsa_bs_stream:
             gsa_title_str = f"Guest Service Agreement - {property_code}"
             if monday_item_id:
                 gsa_title_str += f" | ID:{monday_item_id}"
@@ -383,53 +400,15 @@ def generate():
             }
             
             gsa_files = [
-                ('Files', ('Guest_Service_Agreement.docx', gsa_docx_stream.read(), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'))
+                ('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf'))
             ]
             
             resp_gsa = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=gsa_data, files=gsa_files)
             if resp_gsa.status_code not in (200, 201):
                 logger.error(f"BoldSign GSA API Error: {resp_gsa.status_code} - {resp_gsa.text}")
+                # We won't crash the whole generator if just the GSA fails, but we log it
             else:
-                gsa_doc_id = resp_gsa.json().get('documentId')
-                logger.info(f"Successfully created BoldSign GSA document: {gsa_doc_id}")
-                
-                # Download perfectly rendered PDF from BoldSign for the client zip
-                gsa_dl_resp = requests.get(f"https://api.boldsign.com/v1/document/download?documentId={gsa_doc_id}", headers=headers)
-                if gsa_dl_resp.status_code == 200:
-                    import fitz
-                    
-                    # Stamp CTA Button on BoldSign's PDF
-                    pdf_doc = fitz.open(stream=gsa_dl_resp.content, filetype="pdf")
-                    last_page = pdf_doc[-1]
-                    page_width = last_page.rect.width
-                    page_height = last_page.rect.height
-                    
-                    btn_width = 300
-                    btn_height = 40
-                    btn_x = (page_width - btn_width) / 2
-                    btn_y = page_height - 140
-                    
-                    btn_rect = fitz.Rect(btn_x, btn_y, btn_x + btn_width, btn_y + btn_height)
-                    
-                    shape = last_page.new_shape()
-                    shape.draw_rect(btn_rect)
-                    shape.finish(color=(0, 0.447, 0.807), fill=(0, 0.447, 0.807))
-                    shape.commit()
-                    
-                    text_rect = fitz.Rect(btn_x, btn_y + 13, btn_x + btn_width, btn_y + btn_height)
-                    last_page.insert_textbox(text_rect, "Ready to Move Forward? Click to E-Sign", 
-                                             fontsize=12, fontname="hebo", color=(1, 1, 1), 
-                                             align=fitz.TEXT_ALIGN_CENTER)
-                                             
-                    link_url = f"https://quote-presentation-generator.onrender.com/sign_gsa/{property_code}"
-                    last_page.insert_link({"kind": fitz.LINK_URI, "from": btn_rect, "uri": link_url})
-                    
-                    gsa_client_stream = io.BytesIO()
-                    pdf_doc.save(gsa_client_stream)
-                    pdf_doc.close()
-                    gsa_client_stream.seek(0)
-                else:
-                    logger.error(f"Failed to download GSA document from BoldSign: {gsa_dl_resp.text}")
+                logger.info(f"Successfully created BoldSign GSA document: {resp_gsa.json().get('documentId')}")
 
         logger.info(f"Successfully compiled documents. Preparing download stream.")
         pdf_stream_client.seek(0)
