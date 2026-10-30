@@ -6,7 +6,7 @@ from datetime import datetime
 import fitz  # PyMuPDF
 from docxtpl import DocxTemplate
 
-def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_email, hotel_name, room_count, term, studio, meeting_fee, notes, for_boldsign=False):
+def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_email, hotel_name, address, room_count, term, studio, meeting_fee, notes, for_boldsign=False):
     # Perform math calculations
     try:
         room_count = int(room_count)
@@ -26,6 +26,7 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
         "SIGNER_NAME": signer_name or "",
         "SIGNER_EMAIL": signer_email or "",
         "HOTEL_NAME": hotel_name or "",
+        "ADDRESS": address or "",
         "INN_CODE": property_code.upper() if property_code else "",
         "TERM": term or "",
         "DATE": datetime.now().strftime("%B %d, %Y"),

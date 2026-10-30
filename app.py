@@ -246,6 +246,39 @@ def generate():
             logger.info(f"GSA generation requested for {property_code}. Extracting details.")
             hotel_name = property_code
             room_count = 0
+            address = ""
+            
+            # Fetch Monday details for Address
+            if monday_item_id:
+                monday_token = os.environ.get("MONDAY_API_TOKEN")
+                if monday_token:
+                    monday_headers = {
+                        "Authorization": monday_token, 
+                        "API-Version": "2024-01", 
+                        "Content-Type": "application/json"
+                    }
+                    query = """
+                    query ($itemId: [ID!]) {
+                      items(ids: $itemId) {
+                        column_values {
+                          column { title }
+                          text
+                        }
+                      }
+                    }
+                    """
+                    try:
+                        item_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": query, "variables": {"itemId": [monday_item_id]}
+                        })
+                        if item_resp.status_code == 200:
+                            cols = item_resp.json().get("data", {}).get("items", [{}])[0].get("column_values", [])
+                            for col in cols:
+                                title = col.get("column", {}).get("title")
+                                if title == "Property Address" and col.get("text"):
+                                    address = col.get("text")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch Monday details for GSA: {e}")
             
             # Extract from Excel
             try:
@@ -284,6 +317,7 @@ def generate():
                 signer_name=signer_name,
                 signer_email=signer_email,
                 hotel_name=hotel_name,
+                address=address,
                 room_count=room_count,
                 term=gsa_term,
                 studio=gsa_studio,
@@ -299,6 +333,7 @@ def generate():
                 signer_name=signer_name,
                 signer_email=signer_email,
                 hotel_name=hotel_name,
+                address=address,
                 room_count=room_count,
                 term=gsa_term,
                 studio=gsa_studio,
