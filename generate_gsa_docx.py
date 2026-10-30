@@ -5,6 +5,7 @@ import subprocess
 from datetime import datetime
 import fitz  # PyMuPDF
 from docx import Document
+from python_docx_replace.paragraph import Paragraph
 
 def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_email, hotel_name, address, room_count, term, studio, meeting_fee, notes, for_boldsign=False):
     # Perform math calculations
@@ -43,26 +44,11 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
     
     doc = Document(template_path)
     
-    def process_element(element):
-        for p in element.paragraphs:
-            if '{{' in p.text:
-                # Merge runs to prevent run-splitting bugs
-                text = p.text
-                for r in p.runs:
-                    r.text = ''
-                if p.runs:
-                    p.runs[0].text = text
-                
-                # Replace tags
-                for k, v in replacements.items():
-                    if k in p.text:
-                        p.text = p.text.replace(k, v)
-
-    process_element(doc)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                process_element(cell)
+    # Use python_docx_replace to cleanly replace text across runs without destroying styling
+    for p in Paragraph.get_all(doc):
+        paragraph = Paragraph(p)
+        for key, value in replacements.items():
+            paragraph.replace_key(key, str(value))
     
     # Convert docx to PDF using LibreOffice headless
     with tempfile.TemporaryDirectory() as temp_dir:
