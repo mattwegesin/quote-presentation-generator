@@ -242,6 +242,7 @@ def generate():
         # ---------------------------------------------------------
         gsa_client_stream = None
         gsa_bs_stream = None
+        gsa_raw_docx_stream = None
         if generate_gsa:
             logger.info(f"GSA generation requested for {property_code}. Extracting details.")
             hotel_name = property_code
@@ -310,23 +311,51 @@ def generate():
             from generate_gsa_docx import generate_gsa_docx_to_pdf
             template_path = os.path.join(os.path.dirname(__file__), "GSA_TAGS.docx")
             
-            # Generate GSA for BoldSign (No CTA Button)
-            gsa_bs_stream = generate_gsa_docx_to_pdf(
-                template_path=template_path,
-                property_code=property_code,
-                signer_name=signer_name,
-                signer_email=signer_email,
-                hotel_name=hotel_name,
-                address=address,
-                room_count=room_count,
-                term=gsa_term,
-                studio=gsa_studio,
-                meeting_fee=gsa_meeting,
-                notes=gsa_notes,
-                for_boldsign=True
-            )
+            # Generate GSA for BoldSign (No CTA Button) - We need the raw DOCX for BoldSign
+            # Let's import the docx library to just do the replacement and save as stream
+            import io
+            from docx import Document
+            from python_docx_replace.paragraph import Paragraph
             
-            # Generate GSA for Client (Has CTA Button)
+            doc_bs = Document(template_path)
+            
+            def format_currency(val):
+                return "${:,.2f}".format(val)
+                
+            connect_support = room_count * 1.50
+            studio_support = 1.00 if gsa_studio == "YES" else 0.00
+            total_studio = room_count * studio_support
+            total_monthly = connect_support + total_studio + gsa_meeting
+            
+            replacements = {
+                "{{SIGNER_NAME}}": signer_name or "",
+                "{{SIGNER_EMAIL}}": signer_email or "",
+                "{{HOTEL_NAME}}": hotel_name or "",
+                "{{ADDRESS}}": address or "",
+                "{{INN_CODE}}": property_code.upper() if property_code else "",
+                "{{TERM}}": gsa_term or "",
+                "{{DATE}}": datetime.now().strftime("%B %d, %Y"),
+                "{{ROOM_COUNT}}": str(room_count),
+                "{{CONNECT_SUPPORT}}": format_currency(connect_support),
+                "{{STUDIO_SUPPORT}}": format_currency(studio_support),
+                "{{TOTAL_STUDIO}}": format_currency(total_studio),
+                "{{MEETING}}": format_currency(gsa_meeting),
+                "{{TOTAL_MONTHLY}}": format_currency(total_monthly),
+                "{{TOTAL MONTHLY}}": format_currency(total_monthly),
+                "{{NOTES}}": gsa_notes or "",
+                "{{EIN}}": ""
+            }
+            
+            for p in Paragraph.get_all(doc_bs):
+                paragraph = Paragraph(p)
+                for key, value in replacements.items():
+                    paragraph.replace_key(key, str(value))
+                    
+            gsa_raw_docx_stream = io.BytesIO()
+            doc_bs.save(gsa_raw_docx_stream)
+            gsa_raw_docx_stream.seek(0)
+            
+            # Generate GSA for Client (Has CTA Button, converted to PDF via LibreOffice)
             gsa_client_stream = generate_gsa_docx_to_pdf(
                 template_path=template_path,
                 property_code=property_code,
@@ -400,7 +429,7 @@ def generate():
             }
             
             gsa_files = [
-                ('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf'))
+                ('Files', ('Guest_Service_Agreement.docx', gsa_raw_docx_stream.read(), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'))
             ]
             
             resp_gsa = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=gsa_data, files=gsa_files)
