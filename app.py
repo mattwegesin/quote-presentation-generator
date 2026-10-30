@@ -393,7 +393,10 @@ def generate():
                 'Signers[0][name]': signer_name,
                 'Signers[0][emailAddress]': signer_email,
                 'Signers[0][signerType]': 'Signer',
-                'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
+                'Signers[0][recipientNotificationSettings][signatureRequest]': 'false',
+                'Signers[1][name]': 'HT Contracts',
+                'Signers[1][emailAddress]': 'contracts@hospitalitytechnologies.com',
+                'Signers[1][signerType]': 'Signer'
             }
             
             gsa_files = [
