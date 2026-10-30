@@ -602,6 +602,9 @@
       <form id="deckForm" action="/generate" method="POST" enctype="multipart/form-data">
         <input type="hidden" id="generate_gsa" name="generate_gsa" value="false">
         <input type="hidden" id="gsa_notes" name="gsa_notes" value="">
+        <input type="hidden" id="gsa_term" name="gsa_term" value="">
+        <input type="hidden" id="gsa_studio" name="gsa_studio" value="">
+        <input type="hidden" id="gsa_meeting" name="gsa_meeting" value="">
         
         <div class="input-list" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
           <div class="input-group">
@@ -732,6 +735,24 @@
         <p style="margin-top: 0.75rem;">Would you like to automatically generate a Guest Service Agreement (GSA) alongside the proposal deck?</p>
         
         <div class="modal-notes" id="gsaNotesSection">
+          <div style="margin-bottom: 1rem;">
+            <label for="gsaTermInput">Agreement Term (Months or Years):</label>
+            <input type="text" id="gsaTermInput" placeholder="e.g. 36 Months" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
+          </div>
+          
+          <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--primary-dark);">Does this property have IHG Studio?</label>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.9rem;">
+              <label><input type="radio" name="gsaStudioRadio" value="YES"> Yes</label>
+              <label><input type="radio" name="gsaStudioRadio" value="NO" checked> No</label>
+            </div>
+          </div>
+          
+          <div style="margin-bottom: 1rem;">
+            <label for="gsaMeetingInput">Meeting Room Monthly Fee (if applicable):</label>
+            <input type="number" id="gsaMeetingInput" placeholder="e.g. 150" value="0" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
+          </div>
+
           <label for="gsaNotesInput">Add specific notes for this GSA (Optional):</label>
           <textarea id="gsaNotesInput" placeholder="e.g. Include addendum B, waiving installation fee..."></textarea>
         </div>
@@ -843,8 +864,14 @@
     const btnGsaCancel = document.getElementById('btnGsaCancel');
     const btnGsaConfirm = document.getElementById('btnGsaConfirm');
     const gsaNotesInput = document.getElementById('gsaNotesInput');
+    const gsaTermInput = document.getElementById('gsaTermInput');
+    const gsaMeetingInput = document.getElementById('gsaMeetingInput');
+    
     const generateGsaInput = document.getElementById('generate_gsa');
     const formGsaNotesInput = document.getElementById('gsa_notes');
+    const formGsaTermInput = document.getElementById('gsa_term');
+    const formGsaStudioInput = document.getElementById('gsa_studio');
+    const formGsaMeetingInput = document.getElementById('gsa_meeting');
 
     if (mondayItemSelect) {
       mondayItemSelect.addEventListener('change', () => {
@@ -914,8 +941,14 @@
       modalButtons1.style.display = 'flex';
       modalButtons2.style.display = 'none';
       gsaNotesInput.value = '';
+      gsaTermInput.value = '';
+      gsaMeetingInput.value = '0';
+      document.querySelector('input[name="gsaStudioRadio"][value="NO"]').checked = true;
       generateGsaInput.value = 'false';
       formGsaNotesInput.value = '';
+      formGsaTermInput.value = '';
+      formGsaStudioInput.value = '';
+      formGsaMeetingInput.value = '';
     }
 
     btnGsaNo.addEventListener('click', (e) => {
@@ -938,8 +971,21 @@
 
     btnGsaConfirm.addEventListener('click', (e) => {
       e.preventDefault();
+      
+      const termValue = gsaTermInput.value.trim();
+      if (!termValue) {
+        alert("Please enter the Agreement Term (e.g. 36 Months).");
+        return;
+      }
+      
       generateGsaInput.value = 'true';
       formGsaNotesInput.value = gsaNotesInput.value;
+      formGsaTermInput.value = termValue;
+      formGsaMeetingInput.value = gsaMeetingInput.value;
+      
+      const studioRadio = document.querySelector('input[name="gsaStudioRadio"]:checked');
+      formGsaStudioInput.value = studioRadio ? studioRadio.value : 'NO';
+      
       gsaModal.classList.remove('active');
       submitForm();
     });

@@ -243,52 +243,69 @@ def generate():
         gsa_client_stream = None
         gsa_bs_stream = None
         if generate_gsa:
-            logger.info(f"GSA generation requested for {property_code}. Fetching Monday.com details.")
+            logger.info(f"GSA generation requested for {property_code}. Extracting details.")
             hotel_name = property_code
-            address = ""
+            room_count = 0
             
-            # Fetch Monday details
-            if monday_item_id:
-                monday_token = os.environ.get("MONDAY_API_TOKEN")
-                if monday_token:
-                    monday_headers = {
-                        "Authorization": monday_token, 
-                        "API-Version": "2024-01", 
-                        "Content-Type": "application/json"
-                    }
-                    query = """
-                    query ($itemId: [ID!]) {
-                      items(ids: $itemId) {
-                        column_values {
-                          column { title }
-                          text
-                        }
-                      }
-                    }
-                    """
+            # Extract from Excel
+            try:
+                import openpyxl
+                excel_stream.seek(0)
+                wb = openpyxl.load_workbook(excel_stream, data_only=True)
+                ws = wb.active
+                
+                extracted_hotel_name = ws['C4'].value
+                if extracted_hotel_name:
+                    hotel_name = str(extracted_hotel_name).strip()
+                    
+                extracted_room_count = ws['C11'].value
+                if extracted_room_count:
                     try:
-                        item_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                            "query": query, "variables": {"itemId": [monday_item_id]}
-                        })
-                        if item_resp.status_code == 200:
-                            cols = item_resp.json().get("data", {}).get("items", [{}])[0].get("column_values", [])
-                            for col in cols:
-                                title = col.get("column", {}).get("title")
-                                if title == "Hotel Name" and col.get("text"):
-                                    hotel_name = col.get("text")
-                                elif title == "Property Address" and col.get("text"):
-                                    address = col.get("text")
-                    except Exception as e:
-                        logger.error(f"Failed to fetch Monday details for GSA: {e}")
+                        room_count = int(extracted_room_count)
+                    except (ValueError, TypeError):
+                        pass
+            except Exception as e:
+                logger.error(f"Failed to extract GSA details from Excel: {e}")
+                
+            gsa_term = request.form.get("gsa_term", "")
+            gsa_studio = request.form.get("gsa_studio", "NO")
+            try:
+                gsa_meeting = float(request.form.get("gsa_meeting", 0))
+            except (ValueError, TypeError):
+                gsa_meeting = 0.0
 
-            from generate_gsa import generate_gsa_pdf
-            template_path = os.path.join(os.path.dirname(__file__), "Hospitality_Technologies_Guest_Support_Agreement_Completed.pdf")
+            from generate_gsa_docx import generate_gsa_docx_to_pdf
+            template_path = os.path.join(os.path.dirname(__file__), "GSA_TAGS.docx")
             
             # Generate GSA for BoldSign (No CTA Button)
-            gsa_bs_stream = generate_gsa_pdf(template_path, hotel_name, address, gsa_notes, property_code, for_boldsign=True)
+            gsa_bs_stream = generate_gsa_docx_to_pdf(
+                template_path=template_path,
+                property_code=property_code,
+                signer_name=signer_name,
+                signer_email=signer_email,
+                hotel_name=hotel_name,
+                room_count=room_count,
+                term=gsa_term,
+                studio=gsa_studio,
+                meeting_fee=gsa_meeting,
+                notes=gsa_notes,
+                for_boldsign=True
+            )
             
             # Generate GSA for Client (Has CTA Button)
-            gsa_client_stream = generate_gsa_pdf(template_path, hotel_name, address, gsa_notes, property_code, for_boldsign=False)
+            gsa_client_stream = generate_gsa_docx_to_pdf(
+                template_path=template_path,
+                property_code=property_code,
+                signer_name=signer_name,
+                signer_email=signer_email,
+                hotel_name=hotel_name,
+                room_count=room_count,
+                term=gsa_term,
+                studio=gsa_studio,
+                meeting_fee=gsa_meeting,
+                notes=gsa_notes,
+                for_boldsign=False
+            )
 
         # ---------------------------------------------------------
         # SEND PROPOSAL TO BOLDSIGN
