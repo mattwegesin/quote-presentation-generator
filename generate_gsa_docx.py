@@ -76,7 +76,7 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
             btn_width = 300
             btn_height = 40
             btn_x = (page_width - btn_width) / 2
-            btn_y = page_height - 80
+            btn_y = page_height - 140  # Moved up from -80 to prevent covering text
             
             btn_rect = fitz.Rect(btn_x, btn_y, btn_x + btn_width, btn_y + btn_height)
             
@@ -86,8 +86,9 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
             shape.finish(color=(0, 0.447, 0.807), fill=(0, 0.447, 0.807)) # Primary Blue
             shape.commit()
             
-            # Add CTA Text
-            last_page.insert_textbox(btn_rect, "Ready to Move Forward? Click to E-Sign", 
+            # Add CTA Text (vertically centered by shifting the text box down 12px)
+            text_rect = fitz.Rect(btn_x, btn_y + 13, btn_x + btn_width, btn_y + btn_height)
+            last_page.insert_textbox(text_rect, "Ready to Move Forward? Click to E-Sign", 
                                      fontsize=12, fontname="hebo", color=(1, 1, 1), 
                                      align=fitz.TEXT_ALIGN_CENTER)
                                      
