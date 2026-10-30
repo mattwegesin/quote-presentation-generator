@@ -389,23 +389,12 @@ def generate():
             gsa_data = {
                 'Title': gsa_title_str,
                 'ExpiryDays': '180',
+                'UseTextTags': 'true',
                 'Signers[0][name]': signer_name,
                 'Signers[0][emailAddress]': signer_email,
                 'Signers[0][signerType]': 'Signer',
                 'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
             }
-            
-            # GSA signature is on page 12 of the independent GSA document
-            gsa_data.update({
-                f'Signers[0][formFields][0][id]': 'gsa_signature',
-                f'Signers[0][formFields][0][fieldType]': 'Signature',
-                f'Signers[0][formFields][0][pageNumber]': '12',
-                f'Signers[0][formFields][0][bounds][x]': '344',
-                f'Signers[0][formFields][0][bounds][y]': '630',
-                f'Signers[0][formFields][0][bounds][width]': '214',
-                f'Signers[0][formFields][0][bounds][height]': '30',
-                f'Signers[0][formFields][0][isRequired]': 'true'
-            })
             
             gsa_files = [
                 ('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf'))
