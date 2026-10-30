@@ -4,10 +4,15 @@ import tempfile
 import subprocess
 from datetime import datetime
 import fitz  # PyMuPDF
-from docx import Document
+from docxtpl import DocxTemplate
 
 def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_email, hotel_name, room_count, term, studio, meeting_fee, notes, for_boldsign=False):
     # Perform math calculations
+    try:
+        room_count = int(room_count)
+    except (ValueError, TypeError):
+        room_count = 0
+        
     connect_support = room_count * 1.50
     studio_support = 1.00 if studio == "YES" else 0.00
     total_studio = room_count * studio_support
@@ -17,44 +22,29 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
     def format_currency(val):
         return "${:,.2f}".format(val)
         
-    replacements = {
-        "{{SIGNER_NAME}}": signer_name or "",
-        "{{SIGNER_EMAIL}}": signer_email or "",
-        "{{HOTEL_NAME}}": hotel_name or "",
-        "{{INN_CODE}}": property_code.upper() if property_code else "",
-        "{{TERM}}": term or "",
-        "{{DATE}}": datetime.now().strftime("%B %d, %Y"),
-        "{{ROOM_COUNT}}": str(room_count),
-        "{{CONNECT_SUPPORT}}": format_currency(connect_support),
-        "{{STUDIO_SUPPORT}}": format_currency(studio_support),
-        "{{TOTAL_STUDIO}}": format_currency(total_studio),
-        "{{MEETING}}": format_currency(meeting_fee),
-        "{{TOTAL MONTHLY}}": format_currency(total_monthly),
-        "{{NOTES}}": notes or "",
-        "{{EIN}}": "" # User left blank
+    context = {
+        "SIGNER_NAME": signer_name or "",
+        "SIGNER_EMAIL": signer_email or "",
+        "HOTEL_NAME": hotel_name or "",
+        "INN_CODE": property_code.upper() if property_code else "",
+        "TERM": term or "",
+        "DATE": datetime.now().strftime("%B %d, %Y"),
+        "ROOM_COUNT": str(room_count),
+        "CONNECT_SUPPORT": format_currency(connect_support),
+        "STUDIO_SUPPORT": format_currency(studio_support),
+        "TOTAL_STUDIO": format_currency(total_studio),
+        "MEETING": format_currency(meeting_fee),
+        "TOTAL_MONTHLY": format_currency(total_monthly),  # Note: using TOTAL_MONTHLY without space for better jinja compatibility, but we should support TOTAL MONTHLY too
+        "TOTAL MONTHLY": format_currency(total_monthly),
+        "NOTES": notes or "",
+        "EIN": "" # User left blank
     }
     
-    doc = Document(template_path)
+    doc = DocxTemplate(template_path)
     
-    # Replace in paragraphs
-    for para in doc.paragraphs:
-        for key, value in replacements.items():
-            if key in para.text:
-                for run in para.runs:
-                    if key in run.text:
-                        run.text = run.text.replace(key, value)
-                        
-    # Replace in tables
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for para in cell.paragraphs:
-                    for key, value in replacements.items():
-                        if key in para.text:
-                            for run in para.runs:
-                                if key in run.text:
-                                    run.text = run.text.replace(key, value)
-                                    
+    # Render the document (this perfectly handles split runs and tables)
+    doc.render(context)
+    
     # Convert docx to PDF using LibreOffice headless
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_docx = os.path.join(temp_dir, "temp_gsa.docx")
