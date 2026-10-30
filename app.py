@@ -390,13 +390,16 @@ def generate():
                 'Title': gsa_title_str,
                 'ExpiryDays': '180',
                 'UseTextTags': 'true',
+                'EnableSigningOrder': 'true',
                 'Signers[0][name]': signer_name,
                 'Signers[0][emailAddress]': signer_email,
                 'Signers[0][signerType]': 'Signer',
+                'Signers[0][signerOrder]': '1',
                 'Signers[0][recipientNotificationSettings][signatureRequest]': 'false',
                 'Signers[1][name]': 'HT Contracts',
                 'Signers[1][emailAddress]': 'contracts@hospitalitytechnologies.com',
-                'Signers[1][signerType]': 'Signer'
+                'Signers[1][signerType]': 'Signer',
+                'Signers[1][signerOrder]': '2'
             }
             
             gsa_files = [
