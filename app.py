@@ -731,7 +731,7 @@ def boldsign_webhook():
                 
             inn_code = "Unknown"
             if " - " in message_title and " | ID:" in message_title:
-                inn_code = message_title.split(" - ")[1].split(" | ID:")[0].strip()
+                inn_code = message_title.split(" - ")[1].split(" | ID:")[0].strip().upper()
 
             is_gsa = "Guest Service Agreement" in message_title
 
