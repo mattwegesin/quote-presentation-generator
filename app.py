@@ -728,6 +728,12 @@ def boldsign_webhook():
             if not monday_item_id:
                 logger.error(f"No MondayItemId found in BoldSign Title string: {message_title}")
                 return jsonify({"status": "error", "message": "Missing MondayItemId in Title"}), 400
+                
+            inn_code = "Unknown"
+            if " - " in message_title and " | ID:" in message_title:
+                inn_code = message_title.split(" - ")[1].split(" | ID:")[0].strip()
+
+            is_gsa = "Guest Service Agreement" in message_title
 
             # 2. Update Monday.com Status and Extract SharePoint Link
             monday_token = os.environ.get("MONDAY_API_TOKEN")
@@ -738,27 +744,61 @@ def boldsign_webhook():
                 "Content-Type": "application/json"
             }
 
-            # Update Status to WON
-            mutation = """
-            mutation ($itemId: ID!, $boardId: ID!) {
-              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\\"label\\":\\"WON\\"}") {
-                id
-              }
-            }
-            """
-            mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                "query": mutation,
-                "variables": {"itemId": monday_item_id, "boardId": board_id}
-            })
-            
-            try:
-                mut_data = mut_resp.json()
-                if "errors" in mut_data:
-                    logger.error(f"Monday Mutation Error: {mut_data['errors']}")
-                else:
-                    logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
-            except Exception as e:
-                logger.error(f"Failed to parse Monday mutation response: {e}")
+            if not is_gsa:
+                # Update Status to WON for Proposal
+                mutation = """
+                mutation ($itemId: ID!, $boardId: ID!) {
+                  change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\\"label\\":\\"WON\\"}") {
+                    id
+                  }
+                }
+                """
+                mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                    "query": mutation,
+                    "variables": {"itemId": monday_item_id, "boardId": board_id}
+                })
+                
+                try:
+                    mut_data = mut_resp.json()
+                    if "errors" in mut_data:
+                        logger.error(f"Monday Mutation Error: {mut_data['errors']}")
+                    else:
+                        logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
+                except Exception as e:
+                    logger.error(f"Failed to parse Monday mutation response: {e}")
+            else:
+                # Create a NEW Item for GSA in "Opportunities" group (id: "topics")
+                create_mutation = """
+                mutation ($boardId: ID!, $group: String!, $itemName: String!, $colVals: JSON!) {
+                  create_item(board_id: $boardId, group_id: $group, item_name: $itemName, column_values: $colVals) {
+                    id
+                  }
+                }
+                """
+                # color_mm5zq7cg is "Quote Type"
+                col_vals = json.dumps({
+                    "color_mm5zq7cg": {"label": "GSA Only"}
+                })
+                
+                create_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                    "query": create_mutation,
+                    "variables": {
+                        "boardId": board_id,
+                        "group": "topics",
+                        "itemName": inn_code,
+                        "colVals": col_vals
+                    }
+                })
+                
+                try:
+                    create_data = create_resp.json()
+                    if "errors" in create_data:
+                        logger.error(f"Monday Create Item Error: {create_data['errors']}")
+                    else:
+                        new_item_id = create_data.get("data", {}).get("create_item", {}).get("id")
+                        logger.info(f"Successfully created new GSA item {new_item_id} in Opportunities.")
+                except Exception as e:
+                    logger.error(f"Failed to parse Monday create response: {e}")
 
             # Fetch the Files (SharePoint) link
             query = """
