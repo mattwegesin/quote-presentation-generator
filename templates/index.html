@@ -712,6 +712,33 @@
         </div>
       </form>
 
+      <div id="shareLinksSection" style="display: none; margin-top: 2rem; padding: 1.5rem; background-color: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius);">
+        <h3 style="font-family: var(--font-montserrat); color: var(--primary-dark); font-size: 1.1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Email Campaign Links</h3>
+        <p style="font-size: 0.85rem; color: var(--secondary-slate); margin-bottom: 1.5rem;">Copy and paste these buttons directly into your email composer (Outlook, Gmail, HubSpot, etc.). They will route the customer to the online signing portal.</p>
+        
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+          <!-- Proposal Link -->
+          <div style="flex: 1; min-width: 200px;">
+            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--primary-dark);">Proposal Deck:</p>
+            <div id="proposalLinkOutput" style="padding: 1rem; background: #FFF; border: 1px dashed var(--border-color); border-radius: 8px; text-align: center; margin-bottom: 0.5rem;">
+              <!-- The actual hyperlink that gets copied -->
+              <a id="proposalLinkBtn" href="#" style="display: inline-block; background-color: #0072CE; color: #FFFFFF; text-decoration: none; font-family: Arial, sans-serif; font-weight: bold; font-size: 14px; padding: 12px 24px; border-radius: 6px; text-align: center;">View & E-Sign Proposal</a>
+            </div>
+            <button type="button" onclick="copyRichText('proposalLinkOutput', this)" style="width: 100%; background: var(--secondary-slate); color: white; border: none; padding: 0.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">Copy Button</button>
+          </div>
+
+          <!-- GSA Link -->
+          <div style="flex: 1; min-width: 200px; display: none;" id="gsaLinkContainer">
+            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--primary-dark);">Guest Service Agreement:</p>
+            <div id="gsaLinkOutput" style="padding: 1rem; background: #FFF; border: 1px dashed var(--border-color); border-radius: 8px; text-align: center; margin-bottom: 0.5rem;">
+              <!-- The actual hyperlink that gets copied -->
+              <a id="gsaLinkBtn" href="#" style="display: inline-block; background-color: #0072CE; color: #FFFFFF; text-decoration: none; font-family: Arial, sans-serif; font-weight: bold; font-size: 14px; padding: 12px 24px; border-radius: 6px; text-align: center;">View & E-Sign GSA</a>
+            </div>
+            <button type="button" onclick="copyRichText('gsaLinkOutput', this)" style="width: 100%; background: var(--secondary-slate); color: white; border: none; padding: 0.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">Copy Button</button>
+          </div>
+        </div>
+      </div>
+
       <div class="info-callout">
         <strong>In-Memory Processing:</strong> Files are buffered and compiled strictly in-memory using <code>io.BytesIO</code>. No customer or quote data is persisted to the local server disk.
       </div>
@@ -1099,6 +1126,25 @@
         a.remove();
         window.URL.revokeObjectURL(downloadUrl);
 
+        // --- Populate and show the Share Links section ---
+        const baseUrl = "https://quote-presentation-generator.onrender.com";
+        const cleanPropertyCode = document.getElementById('property_code').value.trim().toUpperCase();
+        
+        const proposalBtn = document.getElementById('proposalLinkBtn');
+        proposalBtn.href = `${baseUrl}/sign/${cleanPropertyCode}`;
+        
+        const gsaContainer = document.getElementById('gsaLinkContainer');
+        if (generateGsaInput.value === 'true') {
+          const gsaBtn = document.getElementById('gsaLinkBtn');
+          gsaBtn.href = `${baseUrl}/sign_gsa/${cleanPropertyCode}`;
+          gsaContainer.style.display = 'block';
+        } else {
+          gsaContainer.style.display = 'none';
+        }
+        
+        document.getElementById('shareLinksSection').style.display = 'block';
+        // ------------------------------------------------
+
         btnText.textContent = "Generation Complete!";
         setTimeout(() => {
           btnText.textContent = "Generate Presentation";
@@ -1112,6 +1158,34 @@
         downloadIcon.style.display = 'inline-block';
         progressBar.style.display = 'none';
       }
+    }
+
+    function copyRichText(containerId, btnElem) {
+      const container = document.getElementById(containerId);
+      
+      // Use the modern Clipboard API to write rich HTML
+      const html = container.innerHTML;
+      const text = container.innerText;
+      
+      const blobHtml = new Blob([html], { type: "text/html" });
+      const blobText = new Blob([text], { type: "text/plain" });
+      const data = [new ClipboardItem({
+          "text/html": blobHtml,
+          "text/plain": blobText,
+      })];
+      
+      navigator.clipboard.write(data).then(() => {
+        const originalText = btnElem.textContent;
+        btnElem.textContent = "Copied!";
+        btnElem.style.backgroundColor = "#10B981"; // Green
+        setTimeout(() => {
+          btnElem.textContent = originalText;
+          btnElem.style.backgroundColor = "var(--secondary-slate)";
+        }, 2000);
+      }).catch(err => {
+        console.error("Failed to copy rich text: ", err);
+        showError("Failed to copy to clipboard.");
+      });
     }
 
     function showError(message) {
