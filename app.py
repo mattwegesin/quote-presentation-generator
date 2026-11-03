@@ -791,7 +791,7 @@ def boldsign_webhook():
                         # Monday's duplicate API is async, so subitems might take a few seconds to appear
                         import time
                         subitems = []
-                        max_retries = 5
+                        max_retries = 12
                         
                         for attempt in range(max_retries):
                             sub_query = """
@@ -811,7 +811,7 @@ def boldsign_webhook():
                                     break # Found them!
                             except Exception:
                                 pass
-                            time.sleep(1.5) # Wait 1.5 seconds and try again
+                            time.sleep(2.5) # Wait 2.5 seconds and try again
                             
                         if subitems:
                             logger.info(f"Found {len(subitems)} subitems on duplicated item after retries. Deleting them to start clean...")
