@@ -97,7 +97,7 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
                                      fontsize=12, fontname="hebo", color=(1, 1, 1), 
                                      align=fitz.TEXT_ALIGN_CENTER)
                                      
-            link_url = f"https://quote-presentation-generator.onrender.com/sign_gsa/{property_code}"
+            link_url = f"https://quotepresentation.hospitalitytechnologies.com/sign_gsa/{property_code}"
             last_page.insert_link({"kind": fitz.LINK_URI, "from": btn_rect, "uri": link_url})
             
         output_stream = io.BytesIO()
