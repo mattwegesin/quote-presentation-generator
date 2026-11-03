@@ -788,29 +788,41 @@ def boldsign_webhook():
                         logger.info(f"Successfully duplicated item to new GSA item {new_item_id}")
                         
                         # Clean up subitems from the duplicated item FIRST (before status changes trigger automations)
-                        sub_query = """
-                        query ($itemId: [ID!]) {
-                          items (ids: $itemId) {
-                            subitems { id }
-                          }
-                        }
-                        """
-                        sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                            "query": sub_query,
-                            "variables": {"itemId": [new_item_id]}
-                        })
-                        try:
-                            subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                            if subitems:
-                                logger.info(f"Found {len(subitems)} subitems on duplicated item. Deleting them to start clean...")
-                                for sub in subitems:
-                                    del_query = "mutation ($subId: ID!) { delete_item (item_id: $subId) { id } }"
-                                    requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                        "query": del_query,
-                                        "variables": {"subId": sub['id']}
-                                    })
-                        except Exception as e:
-                            logger.error(f"Failed to clean up subitems on duplicate: {e}")
+                        # Monday's duplicate API is async, so subitems might take a few seconds to appear
+                        import time
+                        subitems = []
+                        max_retries = 5
+                        
+                        for attempt in range(max_retries):
+                            sub_query = """
+                            query ($itemId: [ID!]) {
+                              items (ids: $itemId) {
+                                subitems { id }
+                              }
+                            }
+                            """
+                            sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                "query": sub_query,
+                                "variables": {"itemId": [new_item_id]}
+                            })
+                            try:
+                                subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                                if subitems:
+                                    break # Found them!
+                            except Exception:
+                                pass
+                            time.sleep(1.5) # Wait 1.5 seconds and try again
+                            
+                        if subitems:
+                            logger.info(f"Found {len(subitems)} subitems on duplicated item after retries. Deleting them to start clean...")
+                            for sub in subitems:
+                                del_query = "mutation ($subId: ID!) { delete_item (item_id: $subId) { id } }"
+                                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                    "query": del_query,
+                                    "variables": {"subId": sub['id']}
+                                })
+                        else:
+                            logger.info("No subitems found on duplicated item after waiting. Proceeding.")
                             
                         # Now apply the requested GSA specific column overrides and move group
                         update_query = """
