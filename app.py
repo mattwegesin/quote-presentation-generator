@@ -691,11 +691,13 @@ def get_monday_quotes():
         logger.error(f"Failed to query Monday.com: {e}")
         return jsonify({"error": "Failed to connect to Monday.com"}), 500
 
+# Track processed document IDs to prevent duplicate webhook processing
+processed_doc_ids = set()
+
 @app.route("/api/boldsign-webhook", methods=["POST"])
 def boldsign_webhook():
     """Receives completion events from BoldSign to sync with Monday.com and SharePoint."""
     try:
-        import base64
         event = request.json
         if not event:
             return jsonify({"status": "ignored"}), 200
@@ -706,98 +708,196 @@ def boldsign_webhook():
         if event_type == "Verification":
             logger.info("BoldSign Webhook Verification Received.")
             return jsonify({"status": "verified"}), 200
-
-        # BoldSign uses 'Completed' for the event type and puts the ID in 'data'
+            
         if event_type == "Completed":
             doc_id = event.get("data", {}).get("documentId")
             if not doc_id:
                 logger.error("Webhook received 'Completed' event but no documentId was found.")
                 return jsonify({"error": "Missing documentId"}), 400
                 
-            logger.info(f"Webhook Received: Completed for {doc_id}")
+            # Deduplication check
+            if doc_id in processed_doc_ids:
+                logger.info(f"Webhook Received: Document {doc_id} already processed. Skipping duplicate webhook.")
+                return jsonify({"status": "accepted"}), 200
+            processed_doc_ids.add(doc_id)
+            
+            # Run the heavy processing in a background thread to prevent BoldSign timeout (which causes retries)
+            import threading
+            threading.Thread(target=process_boldsign_webhook_async, args=(event,)).start()
+            return jsonify({"status": "accepted"}), 200
+            
+        return jsonify({"status": "ignored"}), 200
 
-            # 1. Fetch BoldSign Document Properties to get MondayItemId from the Title string
-            bs_api_key = os.environ.get("BOLDSIGN_API_KEY")
-            bs_headers = {'X-API-KEY': bs_api_key, 'Accept': 'application/json'}
-            prop_resp = requests.get(f"https://api.boldsign.com/v1/document/properties?documentId={doc_id}", headers=bs_headers)
-            prop_resp.raise_for_status()
+    except Exception as e:
+        logger.error(f"Webhook initialization error: {e}")
+        return jsonify({"error": str(e)}), 500
 
-            message_title = prop_resp.json().get("messageTitle", "")
-            monday_item_id = None
-            if " | ID:" in message_title:
-                monday_item_id = message_title.split(" | ID:")[1].strip()
+def process_boldsign_webhook_async(event):
+    """Background task to handle Monday.com updates and SharePoint archival."""
+    import base64
+    import time
+    try:
+        doc_id = event.get("data", {}).get("documentId")
+        if not doc_id:
+            logger.error("Webhook received 'Completed' event but no documentId was found.")
+            return
+            
+        logger.info(f"Background Thread: Processing Completed for {doc_id}")
 
-            if not monday_item_id:
-                logger.error(f"No MondayItemId found in BoldSign Title string: {message_title}")
-                return jsonify({"status": "error", "message": "Missing MondayItemId in Title"}), 400
-                
-            inn_code = "Unknown"
-            if " - " in message_title and " | ID:" in message_title:
-                inn_code = message_title.split(" - ")[1].split(" | ID:")[0].strip().upper()
+        # 1. Fetch BoldSign Document Properties to get MondayItemId from the Title string
+        bs_api_key = os.environ.get("BOLDSIGN_API_KEY")
+        bs_headers = {'X-API-KEY': bs_api_key, 'Accept': 'application/json'}
+        prop_resp = requests.get(f"https://api.boldsign.com/v1/document/properties?documentId={doc_id}", headers=bs_headers)
+        prop_resp.raise_for_status()
 
-            is_gsa = "Guest Service Agreement" in message_title
+        message_title = prop_resp.json().get("messageTitle", "")
+        monday_item_id = None
+        if " | ID:" in message_title:
+            monday_item_id = message_title.split(" | ID:")[1].strip()
 
-            # 2. Update Monday.com Status and Extract SharePoint Link
-            monday_token = os.environ.get("MONDAY_API_TOKEN")
-            board_id = "18424851511"
-            monday_headers = {
-                "Authorization": monday_token, 
-                "API-Version": "2024-01", 
-                "Content-Type": "application/json"
+        if not monday_item_id:
+            logger.error(f"No MondayItemId found in BoldSign Title string: {message_title}")
+            return
+            
+        inn_code = "Unknown"
+        if " - " in message_title and " | ID:" in message_title:
+            inn_code = message_title.split(" - ")[1].split(" | ID:")[0].strip().upper()
+
+        is_gsa = "Guest Service Agreement" in message_title
+
+        # 2. Update Monday.com Status and Extract SharePoint Link
+        monday_token = os.environ.get("MONDAY_API_TOKEN")
+        board_id = "18424851511"
+        monday_headers = {
+            "Authorization": monday_token, 
+            "API-Version": "2024-01", 
+            "Content-Type": "application/json"
+        }
+
+        if not is_gsa:
+            # Update Status to WON for Proposal
+            mutation = """
+            mutation ($itemId: ID!, $boardId: ID!) {
+              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\\"label\\":\\"WON\\"}") {
+                id
+              }
             }
-
-            if not is_gsa:
-                # Update Status to WON for Proposal
-                mutation = """
-                mutation ($itemId: ID!, $boardId: ID!) {
-                  change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\\"label\\":\\"WON\\"}") {
-                    id
-                  }
-                }
-                """
-                mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                    "query": mutation,
-                    "variables": {"itemId": monday_item_id, "boardId": board_id}
-                })
-                
-                try:
-                    mut_data = mut_resp.json()
-                    if "errors" in mut_data:
-                        logger.error(f"Monday Mutation Error: {mut_data['errors']}")
-                    else:
-                        logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
-                except Exception as e:
-                    logger.error(f"Failed to parse Monday mutation response: {e}")
-            else:
-                # Duplicate the existing item for GSA, move to Opportunities, and update specific columns
-                dup_query = """
-                mutation ($itemId: ID!) {
-                  duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
-                    id
-                  }
-                }
-                """
-                dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
-                
-                try:
-                    dup_data = dup_resp.json()
-                    if "errors" in dup_data:
-                        logger.error(f"Monday Duplicate Error: {dup_data['errors']}")
-                    else:
-                        new_item_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
-                        logger.info(f"Successfully duplicated item to new GSA item {new_item_id}")
+            """
+            mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                "query": mutation,
+                "variables": {"itemId": monday_item_id, "boardId": board_id}
+            })
+            
+            try:
+                mut_data = mut_resp.json()
+                if "errors" in mut_data:
+                    logger.error(f"Monday Mutation Error: {mut_data['errors']}")
+                else:
+                    logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
+            except Exception as e:
+                logger.error(f"Failed to parse Monday mutation response: {e}")
+        else:
+            # Duplicate the existing item for GSA, move to Opportunities, and update specific columns
+            dup_query = """
+            mutation ($itemId: ID!) {
+              duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
+                id
+              }
+            }
+            """
+            dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
+            
+            try:
+                dup_data = dup_resp.json()
+                if "errors" in dup_data:
+                    logger.error(f"Monday Duplicate Error: {dup_data['errors']}")
+                else:
+                    new_item_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
+                    logger.info(f"Successfully duplicated item to new GSA item {new_item_id}")
+                    
+                    # Clean up subitems from the duplicated item FIRST (before status changes trigger automations)
+                    # Monday's duplicate API is async, so subitems might take a few seconds to appear
+                    subitems = []
+                    max_retries = 12
+                    
+                    for attempt in range(max_retries):
+                        sub_query = """
+                        query ($itemId: [ID!]) {
+                          items (ids: $itemId) {
+                            subitems { id }
+                          }
+                        }
+                        """
+                        sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": sub_query,
+                            "variables": {"itemId": [new_item_id]}
+                        })
+                        try:
+                            subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                            if subitems:
+                                break # Found them!
+                        except Exception:
+                            pass
+                        time.sleep(2.5) # Wait 2.5 seconds and try again
                         
-                        # Clean up subitems from the duplicated item FIRST (before status changes trigger automations)
-                        # Monday's duplicate API is async, so subitems might take a few seconds to appear
-                        import time
-                        subitems = []
-                        max_retries = 12
+                    if subitems:
+                        logger.info(f"Found {len(subitems)} subitems on duplicated item after retries. Deleting them to start clean...")
+                        # Batch the subitem deletion mutations to speed up API requests immensely
+                        del_mutations = []
+                        for idx, sub in enumerate(subitems):
+                            del_mutations.append(f"del{idx}: delete_item (item_id: {sub['id']}) {{ id }}")
                         
-                        for attempt in range(max_retries):
+                        # Monday GraphQL max complexity allows many mutations, but let's chunk it to be safe (e.g., 30 per request)
+                        chunk_size = 30
+                        for i in range(0, len(del_mutations), chunk_size):
+                            chunk = del_mutations[i:i + chunk_size]
+                            del_query = "mutation { " + " ".join(chunk) + " }"
+                            requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": del_query})
+                    else:
+                        logger.info("No subitems found on duplicated item after waiting. Proceeding.")
+                        
+                    # Now apply the requested GSA specific column overrides and move group
+                    update_query = """
+                    mutation ($itemId: ID!, $boardId: ID!, $group: String!, $colVals: JSON!) {
+                      move_item_to_group (item_id: $itemId, group_id: $group) { id }
+                      change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                    }
+                    """
+                    col_vals = json.dumps({
+                        "name": inn_code,
+                        "color_mm5zq7cg": {"label": "GSA ONLY"},
+                        "color_mm5w8ehb": {"label": "Gathering Info"},
+                        "status": {"label": "Sales"},
+                        "color_mm65xpj1": {"label": "Active"},
+                        "color_mm6sy6mm": {"label": "Contract Signed"}
+                    })
+                    
+                    update_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                        "query": update_query,
+                        "variables": {
+                            "itemId": new_item_id,
+                            "boardId": board_id,
+                            "group": "topics",
+                            "colVals": col_vals
+                        }
+                    })
+                    up_data = update_resp.json()
+                    if "errors" in up_data:
+                        logger.error(f"Monday Update Duplicated Item Error: {up_data['errors']}")
+                    else:
+                        logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
+                        
+                        # Poll for newly automated subitems and mark specific ones as Done
+                        target_subitem_names = ["Send GSA Contract", "Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
+                        subitems_to_update = []
+                        max_auto_retries = 15
+                        
+                        logger.info(f"Polling for automated subitems on GSA item {new_item_id}...")
+                        for attempt in range(max_auto_retries):
                             sub_query = """
                             query ($itemId: [ID!]) {
                               items (ids: $itemId) {
-                                subitems { id }
+                                subitems { id name }
                               }
                             }
                             """
@@ -806,188 +906,117 @@ def boldsign_webhook():
                                 "variables": {"itemId": [new_item_id]}
                             })
                             try:
-                                subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                                if subitems:
-                                    break # Found them!
+                                current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                                # Check if the target subitems have been created
+                                found_targets = [sub for sub in current_subitems if sub.get('name') in target_subitem_names]
+                                if len(found_targets) >= len(target_subitem_names):
+                                    subitems_to_update = found_targets
+                                    break
                             except Exception:
                                 pass
-                            time.sleep(2.5) # Wait 2.5 seconds and try again
+                            time.sleep(2.0)
                             
-                        if subitems:
-                            logger.info(f"Found {len(subitems)} subitems on duplicated item after retries. Deleting them to start clean...")
-                            for sub in subitems:
-                                del_query = "mutation ($subId: ID!) { delete_item (item_id: $subId) { id } }"
-                                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                    "query": del_query,
-                                    "variables": {"subId": sub['id']}
-                                })
-                        else:
-                            logger.info("No subitems found on duplicated item after waiting. Proceeding.")
-                            
-                        # Now apply the requested GSA specific column overrides and move group
-                        update_query = """
-                        mutation ($itemId: ID!, $boardId: ID!, $group: String!, $colVals: JSON!) {
-                          move_item_to_group (item_id: $itemId, group_id: $group) { id }
-                          change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
-                        }
-                        """
-                        col_vals = json.dumps({
-                            "name": inn_code,
-                            "color_mm5zq7cg": {"label": "GSA ONLY"},
-                            "color_mm5w8ehb": {"label": "Gathering Info"},
-                            "status": {"label": "Sales"},
-                            "color_mm65xpj1": {"label": "Active"},
-                            "color_mm6sy6mm": {"label": "Contract Signed"}
-                        })
-                        
-                        update_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                            "query": update_query,
-                            "variables": {
-                                "itemId": new_item_id,
-                                "boardId": board_id,
-                                "group": "topics",
-                                "colVals": col_vals
-                            }
-                        })
-                        up_data = update_resp.json()
-                        if "errors" in up_data:
-                            logger.error(f"Monday Update Duplicated Item Error: {up_data['errors']}")
-                        else:
-                            logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
-                            
-                            # Poll for newly automated subitems and mark specific ones as Done
-                            target_subitem_names = ["Send GSA Contract", "Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
-                            subitems_to_update = []
-                            max_auto_retries = 15
-                            
-                            logger.info(f"Polling for automated subitems on GSA item {new_item_id}...")
-                            for attempt in range(max_auto_retries):
-                                sub_query = """
-                                query ($itemId: [ID!]) {
-                                  items (ids: $itemId) {
-                                    subitems { id name }
-                                  }
+                        if subitems_to_update:
+                            logger.info(f"Found {len(subitems_to_update)} target subitems. Marking as Done...")
+                            for sub in subitems_to_update:
+                                update_sub_query = """
+                                mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
+                                  change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
                                 }
                                 """
-                                sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                    "query": sub_query,
-                                    "variables": {"itemId": [new_item_id]}
-                                })
-                                try:
-                                    current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                                    # Check if the target subitems have been created
-                                    found_targets = [sub for sub in current_subitems if sub.get('name') in target_subitem_names]
-                                    if len(found_targets) >= len(target_subitem_names):
-                                        subitems_to_update = found_targets
-                                        break
-                                except Exception:
-                                    pass
-                                time.sleep(2.0)
-                                
-                            if subitems_to_update:
-                                logger.info(f"Found {len(subitems_to_update)} target subitems. Marking as Done...")
-                                for sub in subitems_to_update:
-                                    update_sub_query = """
-                                    mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
-                                      change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                    "query": update_sub_query,
+                                    "variables": {
+                                        "itemId": sub['id'],
+                                        "boardId": "18424851639",
+                                        "colVals": json.dumps({"status": {"label": "Done"}})
                                     }
-                                    """
-                                    requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                        "query": update_sub_query,
-                                        "variables": {
-                                            "itemId": sub['id'],
-                                            "boardId": "18424851639",
-                                            "colVals": json.dumps({"status": {"label": "Done"}})
-                                        }
-                                    })
-                            else:
-                                logger.warning("Timed out waiting for automated subitems to appear.")
-                            
-                except Exception as e:
-                    logger.error(f"Failed to parse Monday duplicate/update response: {e}")
+                                })
+                        else:
+                            logger.warning("Timed out waiting for automated subitems to appear.")
+                        
+            except Exception as e:
+                logger.error(f"Failed to parse Monday duplicate/update response: {e}")
 
-            # Fetch the Files (SharePoint) link
-            query = """
-            query ($itemId: [ID!]) {
-              items(ids: $itemId) {
-                column_values {
-                  column { title }
-                  text
-                  value
-                }
-              }
+        # Fetch the Files (SharePoint) link
+        query = """
+        query ($itemId: [ID!]) {
+          items(ids: $itemId) {
+            column_values {
+              column { title }
+              text
+              value
             }
-            """
-            item_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                "query": query,
-                "variables": {"itemId": [monday_item_id]}
-            })
-            item_data = item_resp.json()
+          }
+        }
+        """
+        item_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+            "query": query,
+            "variables": {"itemId": [monday_item_id]}
+        })
+        item_data = item_resp.json()
 
-            sp_link = None
-            for col in item_data.get("data", {}).get("items", [])[0].get("column_values", []):
-                if col.get("column", {}).get("title") == "Files":
-                    # Parse link from text or raw JSON value
-                    import json as sys_json
-                    sp_link = col.get("text")
-                    if not sp_link and col.get("value"):
-                        sp_link = sys_json.loads(col.get("value")).get("url")
-                    break
+        sp_link = None
+        for col in item_data.get("data", {}).get("items", [])[0].get("column_values", []):
+            if col.get("column", {}).get("title") == "Files":
+                # Parse link from text or raw JSON value
+                import json as sys_json
+                sp_link = col.get("text")
+                if not sp_link and col.get("value"):
+                    sp_link = sys_json.loads(col.get("value")).get("url")
+                break
 
-            if not sp_link:
-                logger.warning(f"Could not extract SharePoint link from Monday.com item {monday_item_id}")
-                return jsonify({"status": "partial", "message": "Updated Monday but missing SP link"}), 200
+        if not sp_link:
+            logger.warning(f"Could not extract SharePoint link from Monday.com item {monday_item_id}")
+            return
 
-            # 3. Download signed PDF from BoldSign
-            dl_resp = requests.get(f"https://api.boldsign.com/v1/document/download?documentId={doc_id}", headers=bs_headers)
-            dl_resp.raise_for_status()
-            pdf_bytes = dl_resp.content
+        # 3. Download signed PDF from BoldSign
+        dl_resp = requests.get(f"https://api.boldsign.com/v1/document/download?documentId={doc_id}", headers=bs_headers)
+        dl_resp.raise_for_status()
+        pdf_bytes = dl_resp.content
 
-            # 4. Upload to SharePoint via MS Graph API
-            tenant_id = os.environ.get("MS_GRAPH_TENANT_ID")
-            client_id = os.environ.get("MS_GRAPH_CLIENT_ID")
-            client_secret = os.environ.get("MS_GRAPH_CLIENT_SECRET")
+        # 4. Upload to SharePoint via MS Graph API
+        tenant_id = os.environ.get("MS_GRAPH_TENANT_ID")
+        client_id = os.environ.get("MS_GRAPH_CLIENT_ID")
+        client_secret = os.environ.get("MS_GRAPH_CLIENT_SECRET")
 
-            if not all([tenant_id, client_id, client_secret]):
-                logger.error("Missing MS Graph credentials in environment variables")
-                return jsonify({"status": "partial", "message": "Missing MS Graph credentials"}), 200
+        if not all([tenant_id, client_id, client_secret]):
+            logger.error("Missing MS Graph credentials in environment variables")
+            return
 
-            token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-            token_resp = requests.post(token_url, data={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": "https://graph.microsoft.com/.default"
-            })
-            token_resp.raise_for_status()
-            ms_token = token_resp.json().get("access_token")
+        token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        token_resp = requests.post(token_url, data={
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": "https://graph.microsoft.com/.default"
+        })
+        token_resp.raise_for_status()
+        ms_token = token_resp.json().get("access_token")
 
-            # Convert SharePoint web URL to Graph API Sharing URL
-            encoded_url = base64.b64encode(sp_link.encode("utf-8")).decode("utf-8")
-            encoded_url = "u!" + encoded_url.rstrip("=").replace("/", "_").replace("+", "-")
+        # Convert SharePoint web URL to Graph API Sharing URL
+        encoded_url = base64.b64encode(sp_link.encode("utf-8")).decode("utf-8")
+        encoded_url = "u!" + encoded_url.rstrip("=").replace("/", "_").replace("+", "-")
 
-            folder_url = f"https://graph.microsoft.com/v1.0/shares/{encoded_url}/driveItem"
-            ms_headers = {"Authorization": f"Bearer {ms_token}"}
-            folder_resp = requests.get(folder_url, headers=ms_headers)
-            folder_resp.raise_for_status()
+        folder_url = f"https://graph.microsoft.com/v1.0/shares/{encoded_url}/driveItem"
+        ms_headers = {"Authorization": f"Bearer {ms_token}"}
+        folder_resp = requests.get(folder_url, headers=ms_headers)
+        folder_resp.raise_for_status()
 
-            folder_info = folder_resp.json()
-            drive_id = folder_info.get("parentReference", {}).get("driveId")
-            item_id = folder_info.get("id")
+        folder_info = folder_resp.json()
+        drive_id = folder_info.get("parentReference", {}).get("driveId")
+        item_id = folder_info.get("id")
 
-            # Upload the file
-            file_name = f"Signed_Agreement_{doc_id[:8]}.pdf"
-            upload_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}:/{file_name}:/content"
-            upload_resp = requests.put(upload_url, headers={"Authorization": f"Bearer {ms_token}", "Content-Type": "application/pdf"}, data=pdf_bytes)
-            upload_resp.raise_for_status()
+        # Upload the file
+        file_name = f"Signed_Agreement_{doc_id[:8]}.pdf"
+        upload_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item_id}:/{file_name}:/content"
+        upload_resp = requests.put(upload_url, headers={"Authorization": f"Bearer {ms_token}", "Content-Type": "application/pdf"}, data=pdf_bytes)
+        upload_resp.raise_for_status()
 
-            logger.info("Successfully updated Monday.com status and uploaded PDF to SharePoint.")
-            return jsonify({"status": "success", "message": "Pipeline completed"}), 200
-
-        return jsonify({"status": "ignored"}), 200
+        logger.info("Successfully updated Monday.com status and uploaded PDF to SharePoint.")
+        
     except Exception as e:
         logger.error(f"Webhook processing error: {e}")
-        return jsonify({"error": str(e)}), 500
 
 @app.route("/health", methods=["GET"])
 def health():
