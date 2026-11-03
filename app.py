@@ -785,38 +785,7 @@ def boldsign_webhook():
                         new_item_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
                         logger.info(f"Successfully duplicated item to new GSA item {new_item_id}")
                         
-                        update_query = """
-                        mutation ($itemId: ID!, $boardId: ID!, $group: String!, $colVals: JSON!) {
-                          move_item_to_group (item_id: $itemId, group_id: $group) { id }
-                          change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
-                        }
-                        """
-                        # Apply the requested GSA specific column overrides
-                        col_vals = json.dumps({
-                            "name": inn_code,
-                            "color_mm5zq7cg": {"label": "GSA ONLY"},
-                            "color_mm5w8ehb": {"label": "Gathering Info"},
-                            "status": {"label": "Sales"},
-                            "color_mm65xpj1": {"label": "Active"},
-                            "color_mm6sy6mm": {"label": "Contract Signed"}
-                        })
-                        
-                        update_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                            "query": update_query,
-                            "variables": {
-                                "itemId": new_item_id,
-                                "boardId": board_id,
-                                "group": "topics",
-                                "colVals": col_vals
-                            }
-                        })
-                        up_data = update_resp.json()
-                        if "errors" in up_data:
-                            logger.error(f"Monday Update Duplicated Item Error: {up_data['errors']}")
-                        else:
-                            logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
-                            
-                        # Clean up subitems from the duplicated item
+                        # Clean up subitems from the duplicated item FIRST (before status changes trigger automations)
                         sub_query = """
                         query ($itemId: [ID!]) {
                           items (ids: $itemId) {
@@ -840,6 +809,37 @@ def boldsign_webhook():
                                     })
                         except Exception as e:
                             logger.error(f"Failed to clean up subitems on duplicate: {e}")
+                            
+                        # Now apply the requested GSA specific column overrides and move group
+                        update_query = """
+                        mutation ($itemId: ID!, $boardId: ID!, $group: String!, $colVals: JSON!) {
+                          move_item_to_group (item_id: $itemId, group_id: $group) { id }
+                          change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                        }
+                        """
+                        col_vals = json.dumps({
+                            "name": inn_code,
+                            "color_mm5zq7cg": {"label": "GSA ONLY"},
+                            "color_mm5w8ehb": {"label": "Gathering Info"},
+                            "status": {"label": "Sales"},
+                            "color_mm65xpj1": {"label": "Active"},
+                            "color_mm6sy6mm": {"label": "Contract Signed"}
+                        })
+                        
+                        update_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": update_query,
+                            "variables": {
+                                "itemId": new_item_id,
+                                "boardId": board_id,
+                                "group": "topics",
+                                "colVals": col_vals
+                            }
+                        })
+                        up_data = update_resp.json()
+                        if "errors" in up_data:
+                            logger.error(f"Monday Update Duplicated Item Error: {up_data['errors']}")
+                        else:
+                            logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
                             
                 except Exception as e:
                     logger.error(f"Failed to parse Monday duplicate/update response: {e}")
