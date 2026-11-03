@@ -855,6 +855,54 @@ def boldsign_webhook():
                         else:
                             logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
                             
+                            # Poll for newly automated subitems and mark specific ones as Done
+                            target_subitem_names = ["Send GSA Contract", "Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
+                            subitems_to_update = []
+                            max_auto_retries = 15
+                            
+                            logger.info(f"Polling for automated subitems on GSA item {new_item_id}...")
+                            for attempt in range(max_auto_retries):
+                                sub_query = """
+                                query ($itemId: [ID!]) {
+                                  items (ids: $itemId) {
+                                    subitems { id name }
+                                  }
+                                }
+                                """
+                                sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                    "query": sub_query,
+                                    "variables": {"itemId": [new_item_id]}
+                                })
+                                try:
+                                    current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                                    # Check if the target subitems have been created
+                                    found_targets = [sub for sub in current_subitems if sub.get('name') in target_subitem_names]
+                                    if len(found_targets) >= len(target_subitem_names):
+                                        subitems_to_update = found_targets
+                                        break
+                                except Exception:
+                                    pass
+                                time.sleep(2.0)
+                                
+                            if subitems_to_update:
+                                logger.info(f"Found {len(subitems_to_update)} target subitems. Marking as Done...")
+                                for sub in subitems_to_update:
+                                    update_sub_query = """
+                                    mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
+                                      change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                                    }
+                                    """
+                                    requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                        "query": update_sub_query,
+                                        "variables": {
+                                            "itemId": sub['id'],
+                                            "boardId": "18424851639",
+                                            "colVals": json.dumps({"status": {"label": "Done"}})
+                                        }
+                                    })
+                            else:
+                                logger.warning("Timed out waiting for automated subitems to appear.")
+                            
                 except Exception as e:
                     logger.error(f"Failed to parse Monday duplicate/update response: {e}")
 
