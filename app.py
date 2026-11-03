@@ -815,6 +815,32 @@ def boldsign_webhook():
                             logger.error(f"Monday Update Duplicated Item Error: {up_data['errors']}")
                         else:
                             logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
+                            
+                        # Clean up subitems from the duplicated item
+                        sub_query = """
+                        query ($itemId: [ID!]) {
+                          items (ids: $itemId) {
+                            subitems { id }
+                          }
+                        }
+                        """
+                        sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": sub_query,
+                            "variables": {"itemId": [new_item_id]}
+                        })
+                        try:
+                            subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                            if subitems:
+                                logger.info(f"Found {len(subitems)} subitems on duplicated item. Deleting them to start clean...")
+                                for sub in subitems:
+                                    del_query = "mutation ($subId: ID!) { delete_item (item_id: $subId) { id } }"
+                                    requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                        "query": del_query,
+                                        "variables": {"subId": sub['id']}
+                                    })
+                        except Exception as e:
+                            logger.error(f"Failed to clean up subitems on duplicate: {e}")
+                            
                 except Exception as e:
                     logger.error(f"Failed to parse Monday duplicate/update response: {e}")
 
