@@ -1162,19 +1162,14 @@
 
     function copyRichText(containerId, btnElem) {
       const container = document.getElementById(containerId);
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(container);
+      selection.removeAllRanges();
+      selection.addRange(range);
       
-      // Use the modern Clipboard API to write rich HTML
-      const html = container.innerHTML;
-      const text = container.innerText;
-      
-      const blobHtml = new Blob([html], { type: "text/html" });
-      const blobText = new Blob([text], { type: "text/plain" });
-      const data = [new ClipboardItem({
-          "text/html": blobHtml,
-          "text/plain": blobText,
-      })];
-      
-      navigator.clipboard.write(data).then(() => {
+      try {
+        document.execCommand('copy');
         const originalText = btnElem.textContent;
         btnElem.textContent = "Copied!";
         btnElem.style.backgroundColor = "#10B981"; // Green
@@ -1182,10 +1177,12 @@
           btnElem.textContent = originalText;
           btnElem.style.backgroundColor = "var(--secondary-slate)";
         }, 2000);
-      }).catch(err => {
-        console.error("Failed to copy rich text: ", err);
+      } catch (err) {
+        console.error("Failed to copy:", err);
         showError("Failed to copy to clipboard.");
-      });
+      } finally {
+        selection.removeAllRanges();
+      }
     }
 
     function showError(message) {

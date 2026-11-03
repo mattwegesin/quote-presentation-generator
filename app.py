@@ -157,7 +157,7 @@ def generate():
         return redirect(url_for("index"))
 
     try:
-        property_code = request.form.get("property_code", "").strip()
+        property_code = request.form.get("property_code", "").strip().upper()
         monday_item_id = request.form.get("monday_item_id", "").strip()
         monday_item_name = request.form.get("monday_item_name", "").strip()
         signer_name = request.form.get("signer_name", "").strip()
@@ -451,7 +451,7 @@ def generate():
 @requires_auth
 def check_netsuite_customer():
     """Checks NetSuite to see if a customer exists by Inn Code/Property Code."""
-    property_code = request.form.get("property_code", "").strip()
+    property_code = request.form.get("property_code", "").strip().upper()
     if not property_code:
         return jsonify({"error": "Property code required"}), 400
         
@@ -495,6 +495,7 @@ def check_netsuite_customer():
 @app.route("/sign/<property_code>", methods=["GET"])
 def sign_document(property_code):
     """Dynamic gateway redirecting to BoldSign embedded signing link."""
+    property_code = property_code.upper()
     boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
     if not boldsign_api_key:
         return "BoldSign integration not configured.", 500
@@ -548,6 +549,7 @@ def sign_document(property_code):
 @app.route("/sign_gsa/<property_code>", methods=["GET"])
 def sign_gsa_document(property_code):
     """Dynamic gateway redirecting to BoldSign embedded signing link specifically for the GSA."""
+    property_code = property_code.upper()
     boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
     if not boldsign_api_key:
         return "BoldSign integration not configured.", 500
@@ -611,7 +613,7 @@ def debug_columns():
 @app.route("/api/get_monday_quotes", methods=["POST"])
 @requires_auth
 def get_monday_quotes():
-    property_code = request.form.get("property_code", "").strip()
+    property_code = request.form.get("property_code", "").strip().upper()
     if not property_code:
         return jsonify({"error": "Property code required"}), 400
         
