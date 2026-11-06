@@ -669,6 +669,8 @@ def get_monday_quotes():
             quote_type = "N/A"
             sales_owner = "N/A"
             item_date = "N/A"
+            contact_name = ""
+            contact_email = ""
             
             for col in item.get("column_values", []):
                 title = col.get("column", {}).get("title", "")
@@ -681,9 +683,18 @@ def get_monday_quotes():
                     if text: sales_owner = text
                 elif "date" in title_lower and "update" not in title_lower:
                     if text: item_date = text
+                elif "contact name" in title_lower:
+                    if text: contact_name = text
+                elif "contact e-mail" in title_lower or "contact email" in title_lower:
+                    if text: contact_email = text
             
             display_name = f"{item_name} | {quote_type} | {sales_owner} | {item_date}"
-            formatted_items.append({"id": item["id"], "name": display_name})
+            formatted_items.append({
+                "id": item["id"], 
+                "name": display_name,
+                "contact_name": contact_name,
+                "contact_email": contact_email
+            })
 
         return jsonify(formatted_items)
         

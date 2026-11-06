@@ -903,6 +903,13 @@
         const selectedOption = mondayItemSelect.options[mondayItemSelect.selectedIndex];
         if (selectedOption && selectedOption.value) {
           mondayItemNameInput.value = selectedOption.textContent;
+          // Auto-fill the signer fields if available
+          if (selectedOption.dataset.contactName) {
+            document.getElementById('signer_name').value = selectedOption.dataset.contactName;
+          }
+          if (selectedOption.dataset.contactEmail) {
+            document.getElementById('signer_email').value = selectedOption.dataset.contactEmail;
+          }
         } else {
           mondayItemNameInput.value = '';
         }
@@ -945,6 +952,8 @@
               const option = document.createElement('option');
               option.value = item.id;
               option.textContent = item.name;
+              if (item.contact_name) option.dataset.contactName = item.contact_name;
+              if (item.contact_email) option.dataset.contactEmail = item.contact_email;
               mondayItemSelect.appendChild(option);
             });
             mondayItemGroup.style.display = 'block';
