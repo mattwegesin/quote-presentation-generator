@@ -10,6 +10,8 @@ from flask import Flask, render_template, request, send_file, flash, redirect, u
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from generate_quote_deck import generate_presentation
+from search_quotes import get_quotes_by_inn_code
+from download_quote import download_ihg_quote_xlsx
 
 # Load environment variables from .env if present
 load_dotenv()
@@ -128,41 +130,44 @@ def generate():
         flash(msg, "error")
         return redirect(url_for("index"))
         
-    if "quote_excel" not in request.files:
-        msg = "The 'Quote Data (.xlsx)' file is required."
-        logger.warning(msg)
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-            return jsonify({"success": False, "error": msg}), 400
-        flash(msg, "error")
-        return redirect(url_for("index"))
+    internal_quote_id = request.form.get("internal_quote_id")
+    
+    quote_excel_file = None
+    excel_filename = None
+    
+    if internal_quote_id:
+        logger.info(f"Downloading internal quote ID {internal_quote_id}")
+        filepath = download_ihg_quote_xlsx(internal_quote_id, output_dir="/tmp")
+        if not filepath:
+            msg = f"Failed to download internal quote {internal_quote_id}."
+            logger.warning(msg)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+                return jsonify({"success": False, "error": msg}), 400
+            flash(msg, "error")
+            return redirect(url_for("index"))
+            
+        excel_filename = os.path.basename(filepath)
+        quote_excel_file = open(filepath, 'rb')
+    else:
+        if "quote_excel" not in request.files or not request.files["quote_excel"].filename:
+            msg = "The 'Quote Data (.xlsx)' file or an internal quote selection is required."
+            logger.warning(msg)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+                return jsonify({"success": False, "error": msg}), 400
+            flash(msg, "error")
+            return redirect(url_for("index"))
 
-    quote_excel_file = request.files["quote_excel"]
+        quote_excel_file = request.files["quote_excel"]
+        excel_filename = quote_excel_file.filename
 
-    # Verify filenames
-    if base_pptx_choice == "custom" and not request.files.get("base_pptx").filename:
-        msg = "Please select a base presentation file before clicking Generate Presentation."
-        logger.warning(msg)
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-            return jsonify({"success": False, "error": msg}), 400
-        flash(msg, "error")
-        return redirect(url_for("index"))
-        
-    if not quote_excel_file.filename:
-        msg = "Please select an excel file before clicking Generate Presentation."
-        logger.warning(msg)
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-            return jsonify({"success": False, "error": msg}), 400
-        flash(msg, "error")
-        return redirect(url_for("index"))
-
-    # Validate excel extension
-    if not has_allowed_extension(quote_excel_file.filename, ALLOWED_EXCEL_EXTENSIONS):
-        msg = f"Invalid quote data format '{quote_excel_file.filename}'. Only .xlsx or .xls files are supported."
-        logger.warning(msg)
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-            return jsonify({"success": False, "error": msg}), 400
-        flash(msg, "error")
-        return redirect(url_for("index"))
+        # Validate excel extension
+        if not has_allowed_extension(excel_filename, ALLOWED_EXCEL_EXTENSIONS):
+            msg = f"Invalid quote data format '{excel_filename}'. Only .xlsx or .xls files are supported."
+            logger.warning(msg)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+                return jsonify({"success": False, "error": msg}), 400
+            flash(msg, "error")
+            return redirect(url_for("index"))
 
     try:
         property_code = request.form.get("property_code", "").strip().upper()
@@ -177,7 +182,7 @@ def generate():
         # Build dynamic filename
         import re
         from datetime import datetime
-        safe_excel_filename = secure_filename(quote_excel_file.filename)
+        safe_excel_filename = secure_filename(excel_filename)
         quote_match = re.search(r'quote-(\d+)', safe_excel_filename, re.IGNORECASE)
         quote_num = quote_match.group(1) if quote_match else "UNKNOWN"
 
@@ -224,7 +229,7 @@ def generate():
         
         pptx_stream.seek(0)
         
-        logger.info("Buffering Quote Excel file in memory: '%s'", secure_filename(quote_excel_file.filename))
+        logger.info("Buffering Quote Excel file in memory: '%s'", secure_filename(excel_filename))
         excel_stream = io.BytesIO(quote_excel_file.read())
 
         # ---------------------------------------------------------
@@ -726,6 +731,19 @@ def get_monday_quotes():
     except Exception as e:
         logger.error(f"Failed to query Monday.com: {e}")
         return jsonify({"error": "Failed to connect to Monday.com"}), 500
+
+@app.route("/api/internal_quotes", methods=["POST"])
+def get_internal_quotes():
+    property_code = request.form.get("property_code", "").strip().upper()
+    if not property_code:
+        return jsonify({"error": "Property code required"}), 400
+    
+    try:
+        quotes = get_quotes_by_inn_code(property_code)
+        return jsonify(quotes)
+    except Exception as e:
+        logger.error(f"Failed to fetch internal quotes: {e}")
+        return jsonify({"error": "Failed to fetch quotes from internal system"}), 500
 
 # Track processed document IDs to prevent duplicate webhook processing
 processed_doc_ids = set()

@@ -621,6 +621,12 @@
             </select>
             <input type="hidden" id="monday_item_name" name="monday_item_name" value="">
           </div>
+          <div class="input-group" id="internal_quote_group" style="display: none;">
+            <label for="internal_quote_id" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Select IHG Quote (Auto-Download)</label>
+            <select id="internal_quote_id" name="internal_quote_id" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem; background-color: #FAFAFC;">
+              <option value="">-- Select Quote (Optional - will require manual Excel upload if skipped) --</option>
+            </select>
+          </div>
           <div class="input-group">
             <label for="signer_name" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Signer Name</label>
             <input type="text" id="signer_name" name="signer_name" required placeholder="John Doe" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
@@ -922,7 +928,10 @@
     const formGsaMeetingInput = document.getElementById('gsa_meeting');
 
     if (mondayItemSelect) {
-      mondayItemSelect.addEventListener('change', () => {
+      const internalQuoteGroup = document.getElementById('internal_quote_group');
+      const internalQuoteSelect = document.getElementById('internal_quote_id');
+
+      mondayItemSelect.addEventListener('change', async () => {
         const selectedOption = mondayItemSelect.options[mondayItemSelect.selectedIndex];
         if (selectedOption && selectedOption.value) {
           mondayItemNameInput.value = selectedOption.textContent;
@@ -933,8 +942,51 @@
           if (selectedOption.dataset.contactEmail) {
             document.getElementById('signer_email').value = selectedOption.dataset.contactEmail;
           }
+
+          // Fetch Internal Quotes
+          const propCode = document.getElementById('property_code').value.trim();
+          if (propCode) {
+            internalQuoteGroup.style.display = 'block';
+            internalQuoteSelect.innerHTML = '<option value="">Loading quotes...</option>';
+            try {
+              const formData = new FormData();
+              formData.append('property_code', propCode);
+              const resp = await fetch('/api/internal_quotes', {
+                method: 'POST',
+                body: formData
+              });
+              if (!resp.ok) throw new Error('Failed to fetch quotes');
+              const quotes = await resp.json();
+              
+              internalQuoteSelect.innerHTML = '<option value="">-- Select Quote (Optional) --</option>';
+              if (quotes.length === 0) {
+                internalQuoteSelect.innerHTML = '<option value="">-- No Quotes Found for ' + propCode + ' --</option>';
+              } else {
+                quotes.forEach(q => {
+                   // Extract the ID from the first link (e.g. customerView.php?id=40125)
+                   let qId = "";
+                   if (q.links && q.links.length > 0) {
+                       const match = q.links.find(l => l.includes('id='));
+                       if (match) qId = match.split('id=')[1].split('&')[0];
+                   }
+                   if (qId) {
+                       const opt = document.createElement('option');
+                       opt.value = qId;
+                       opt.textContent = `${q.job} | ${q.package} | ${q.status} | $${q.grand_total}`;
+                       internalQuoteSelect.appendChild(opt);
+                   }
+                });
+              }
+            } catch (err) {
+              console.error(err);
+              internalQuoteSelect.innerHTML = '<option value="">Error loading quotes</option>';
+            }
+          }
+
         } else {
           mondayItemNameInput.value = '';
+          internalQuoteGroup.style.display = 'none';
+          internalQuoteSelect.innerHTML = '<option value="">-- Select Quote (Optional) --</option>';
         }
       });
     }
@@ -1065,8 +1117,11 @@
         return;
       }
       
-      if (!excelInput.files[0]) {
-        showError("Please upload the Quote Data (.xlsx) file.");
+      const internalQuoteSelect = document.getElementById('internal_quote_id');
+      const hasInternalQuote = internalQuoteSelect && internalQuoteSelect.value !== "";
+      
+      if (!excelInput.files[0] && !hasInternalQuote) {
+        showError("Please upload the Quote Data (.xlsx) file or select an internal quote.");
         return;
       }
       
