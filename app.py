@@ -10,7 +10,7 @@ from flask import Flask, render_template, request, send_file, flash, redirect, u
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from generate_quote_deck import generate_presentation
-from search_quotes import get_quotes_by_inn_code
+from search_quotes import get_quotes_by_inn_code, mark_quote_won
 from download_quote import download_ihg_quote_xlsx
 
 # Load environment variables from .env if present
@@ -378,6 +378,8 @@ def generate():
         title_str = f"Hospitality Technologies Agreement - {property_code}"
         if monday_item_id:
             title_str += f" | ID:{monday_item_id}"
+        if internal_quote_id:
+            title_str += f" | QID:{internal_quote_id}"
 
         proposal_data = {
             'Title': title_str,
@@ -806,8 +808,17 @@ def process_boldsign_webhook_async(event):
 
         message_title = prop_resp.json().get("messageTitle", "")
         monday_item_id = None
-        if " | ID:" in message_title:
-            monday_item_id = message_title.split(" | ID:")[1].strip()
+        internal_quote_id = None
+        
+        if " | QID:" in message_title:
+            internal_quote_id = message_title.split(" | QID:")[1].strip()
+            # Clean up message_title so monday_item_id splitting works if QID is appended
+            message_title_for_id = message_title.split(" | QID:")[0]
+        else:
+            message_title_for_id = message_title
+            
+        if " | ID:" in message_title_for_id:
+            monday_item_id = message_title_for_id.split(" | ID:")[1].strip()
 
         if not monday_item_id:
             logger.error(f"No MondayItemId found in BoldSign Title string: {message_title}")
@@ -850,6 +861,15 @@ def process_boldsign_webhook_async(event):
                     logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
             except Exception as e:
                 logger.error(f"Failed to parse Monday mutation response: {e}")
+
+            # Also update internal Quote Tool to WON if we have the Quote ID
+            if internal_quote_id:
+                logger.info(f"Marking internal Quote {internal_quote_id} as WON.")
+                success = mark_quote_won(internal_quote_id)
+                if success:
+                    logger.info(f"Successfully updated internal Quote {internal_quote_id} to WON.")
+                else:
+                    logger.error(f"Failed to update internal Quote {internal_quote_id} to WON.")
         else:
             # Duplicate the existing item for GSA, move to Opportunities, and update specific columns
             dup_query = """
