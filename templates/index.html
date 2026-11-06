@@ -632,13 +632,19 @@
         </div>
         <div class="upload-grid">
           <!-- Base PPTX Upload -->
-          <div class="dropzone-container">
+          <div class="dropzone-container" style="display: flex; flex-direction: column;">
             <div class="dropzone-label">
-              <span>Base Presentation</span>
-              <span class="badge-req">.pptx</span>
+              <span>Base Presentation Template</span>
             </div>
-            <div class="dropzone" id="pptx-dropzone">
-              <input type="file" id="base_pptx" name="base_pptx" accept=".pptx" required>
+            
+            <select id="base_pptx_choice" name="base_pptx_choice" style="margin-bottom: 1rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem; background-color: #FAFAFC;">
+              <option value="Refresh_Proposal_Template.pptx">Refresh Proposal Template</option>
+              <option value="Cabling_Proposal_Template.pptx">Cabling Proposal Template</option>
+              <option value="custom">-- Upload Custom Template --</option>
+            </select>
+            
+            <div class="dropzone" id="pptx-dropzone" style="display: none;">
+              <input type="file" id="base_pptx" name="base_pptx" accept=".pptx">
               <div class="dropzone-content" id="pptx-content">
                 <div class="dropzone-icon">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -879,6 +885,23 @@
     const mondayItemSelect = document.getElementById('monday_item_id');
     const mondayItemNameInput = document.getElementById('monday_item_name');
     
+    const basePptxChoice = document.getElementById('base_pptx_choice');
+    const pptxDropzone = document.getElementById('pptx-dropzone');
+    const basePptxInput = document.getElementById('base_pptx');
+
+    if (basePptxChoice) {
+      basePptxChoice.addEventListener('change', () => {
+        if (basePptxChoice.value === 'custom') {
+          pptxDropzone.style.display = 'block';
+        } else {
+          pptxDropzone.style.display = 'none';
+          basePptxInput.value = ''; // clear any uploaded file
+          document.getElementById('pptx-content').style.display = 'flex';
+          document.getElementById('pptx-preview').style.display = 'none';
+        }
+      });
+    }
+    
     const gsaModal = document.getElementById('gsaModal');
     const modalInnCode = document.getElementById('modalInnCode');
     const btnGsaNo = document.getElementById('btnGsaNo');
@@ -1036,8 +1059,14 @@
         return;
       }
 
-      if (!pptxInput.files[0] || !excelInput.files[0]) {
-        showError("Please upload both the Base Presentation (.pptx) and Quote Data (.xlsx) files.");
+      const pptxChoice = document.getElementById('base_pptx_choice').value;
+      if (pptxChoice === 'custom' && !pptxInput.files[0]) {
+        showError("Please upload the Custom Base Presentation (.pptx) file.");
+        return;
+      }
+      
+      if (!excelInput.files[0]) {
+        showError("Please upload the Quote Data (.xlsx) file.");
         return;
       }
       

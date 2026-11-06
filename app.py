@@ -118,36 +118,44 @@ def generate():
     3. Synthesizes slide deck with financial calculations, summary cards, and disclaimers.
     4. Directly streams compiled PPTX back to the client as an attachment.
     """
-    # Verify both file parts exist in multipart request
-    if "base_pptx" not in request.files or "quote_excel" not in request.files:
-        msg = "Both 'Base Presentation (.pptx)' and 'Quote Data (.xlsx)' files are required."
+    # Verify file parts exist
+    base_pptx_choice = request.form.get("base_pptx_choice", "custom")
+    if base_pptx_choice == "custom" and "base_pptx" not in request.files:
+        msg = "The 'Base Presentation (.pptx)' file is required for a custom upload."
+        logger.warning(msg)
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+            return jsonify({"success": False, "error": msg}), 400
+        flash(msg, "error")
+        return redirect(url_for("index"))
+        
+    if "quote_excel" not in request.files:
+        msg = "The 'Quote Data (.xlsx)' file is required."
         logger.warning(msg)
         if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
             return jsonify({"success": False, "error": msg}), 400
         flash(msg, "error")
         return redirect(url_for("index"))
 
-    base_pptx_file = request.files["base_pptx"]
     quote_excel_file = request.files["quote_excel"]
 
     # Verify filenames
-    if not base_pptx_file.filename or not quote_excel_file.filename:
-        msg = "Please select both files before clicking Generate Presentation."
+    if base_pptx_choice == "custom" and not request.files.get("base_pptx").filename:
+        msg = "Please select a base presentation file before clicking Generate Presentation."
+        logger.warning(msg)
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+            return jsonify({"success": False, "error": msg}), 400
+        flash(msg, "error")
+        return redirect(url_for("index"))
+        
+    if not quote_excel_file.filename:
+        msg = "Please select an excel file before clicking Generate Presentation."
         logger.warning(msg)
         if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
             return jsonify({"success": False, "error": msg}), 400
         flash(msg, "error")
         return redirect(url_for("index"))
 
-    # Validate file extensions
-    if not has_allowed_extension(base_pptx_file.filename, ALLOWED_PPTX_EXTENSIONS):
-        msg = f"Invalid base presentation format '{base_pptx_file.filename}'. Only .pptx files are supported."
-        logger.warning(msg)
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-            return jsonify({"success": False, "error": msg}), 400
-        flash(msg, "error")
-        return redirect(url_for("index"))
-
+    # Validate excel extension
     if not has_allowed_extension(quote_excel_file.filename, ALLOWED_EXCEL_EXTENSIONS):
         msg = f"Invalid quote data format '{quote_excel_file.filename}'. Only .xlsx or .xls files are supported."
         logger.warning(msg)
@@ -193,13 +201,30 @@ def generate():
         generate_gsa = request.form.get("generate_gsa", "false").lower() == "true"
         gsa_notes = request.form.get("gsa_notes", "").strip()
 
-        # Read uploaded files directly into in-memory BytesIO buffers
-        logger.info(
-            "Buffering files in memory: base='%s', quote='%s'",
-            secure_filename(base_pptx_file.filename),
-            secure_filename(quote_excel_file.filename)
-        )
-        pptx_stream = io.BytesIO(base_pptx_file.read())
+        # Load PPTX into stream
+        pptx_stream = io.BytesIO()
+        if base_pptx_choice == "custom":
+            base_pptx_file = request.files.get("base_pptx")
+            if not has_allowed_extension(base_pptx_file.filename, ALLOWED_PPTX_EXTENSIONS):
+                msg = f"Invalid base presentation format '{base_pptx_file.filename}'. Only .pptx files are supported."
+                logger.warning(msg)
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+                    return jsonify({"success": False, "error": msg}), 400
+                flash(msg, "error")
+                return redirect(url_for("index"))
+            logger.info("Buffering custom PPTX file in memory: '%s'", secure_filename(base_pptx_file.filename))
+            pptx_stream.write(base_pptx_file.read())
+        else:
+            local_path = os.path.join(os.path.dirname(__file__), base_pptx_choice)
+            if not os.path.exists(local_path):
+                raise FileNotFoundError(f"Standard template {base_pptx_choice} not found on server.")
+            logger.info("Loading standard PPTX template from disk: '%s'", base_pptx_choice)
+            with open(local_path, "rb") as f:
+                pptx_stream.write(f.read())
+        
+        pptx_stream.seek(0)
+        
+        logger.info("Buffering Quote Excel file in memory: '%s'", secure_filename(quote_excel_file.filename))
         excel_stream = io.BytesIO(quote_excel_file.read())
 
         # ---------------------------------------------------------
