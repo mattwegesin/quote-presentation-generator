@@ -10,6 +10,6 @@ requests-oauthlib==2.0.0
 PyMuPDF==1.23.21
 python-docx==1.1.2
 docxtpl==0.20.2
-docxtpl==0.20.2
-python-docx==1.1.2
 python-docx-replace==0.4.4
+pyotp==2.9.0
+beautifulsoup4==4.12.3
