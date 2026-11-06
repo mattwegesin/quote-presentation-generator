@@ -48,7 +48,7 @@ def get_quotes_by_inn_code(inn_code: str):
         # A valid quote row typically has 13 columns and starts with a Job # (e.g. #27850)
         if len(cols) >= 11 and cols[0].startswith('#'):
             quote_data = {
-                "job": cols[0].split('\n')[0].strip(), # Extract just the #ID
+                "job": cols[0].split(' ')[0].strip(), # Extract just the #ID
                 "create_date": cols[1],
                 "approve_date": cols[2],
                 "package": cols[6],
