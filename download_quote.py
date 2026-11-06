@@ -11,6 +11,9 @@ def download_ihg_quote_xlsx(quote_id: str, output_dir: str = "."):
     Returns the filepath of the downloaded file.
     """
     session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
     login_url = "https://quote.hospitalitytechnologies.com/index.php"
     payload = {"username": "api_user", "password": "H0spTech123!", "submitLogin": "1"}
     res = session.post(login_url, data=payload, allow_redirects=False)
@@ -26,13 +29,16 @@ def download_ihg_quote_xlsx(quote_id: str, output_dir: str = "."):
         print(f"Failed to download quote {quote_id}. Status Code: {download_res.status_code}")
         return None
 
+    if 'Content-Disposition' not in download_res.headers:
+        print(f"Failed to download quote {quote_id}. Server returned HTML instead of a file attachment. Likely an authentication failure on the remote server.")
+        return None
+
     # Try to get the real filename from the server headers
     filename = f"quote_{quote_id}.xlsx"
-    if 'Content-Disposition' in download_res.headers:
-        d = download_res.headers['Content-Disposition']
-        fname_match = re.findall("filename=(.+)", d)
-        if len(fname_match) > 0:
-            filename = fname_match[0].strip('"; ')
+    d = download_res.headers['Content-Disposition']
+    fname_match = re.findall("filename=(.+)", d)
+    if len(fname_match) > 0:
+        filename = fname_match[0].strip('"; ')
 
     filepath = os.path.join(output_dir, filename)
     
