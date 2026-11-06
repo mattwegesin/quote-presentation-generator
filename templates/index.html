@@ -966,7 +966,7 @@
                    // Extract the ID from the first link (e.g. customerView.php?id=40125)
                    let qId = "";
                    if (q.links && q.links.length > 0) {
-                       const match = q.links.find(l => l.includes('id='));
+                       const match = q.links.find(l => l.includes('customerView.php?id='));
                        if (match) qId = match.split('id=')[1].split('&')[0];
                    }
                    if (qId) {
