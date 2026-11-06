@@ -989,6 +989,19 @@
           internalQuoteSelect.innerHTML = '<option value="">-- Select Quote (Optional) --</option>';
         }
       });
+
+      internalQuoteSelect.addEventListener('change', () => {
+        if (internalQuoteSelect.value) {
+          document.getElementById('excel-content').style.display = 'none';
+          document.getElementById('excel-preview').style.display = 'flex';
+          document.getElementById('excel-name').textContent = "Auto-Download Quote: " + internalQuoteSelect.options[internalQuoteSelect.selectedIndex].text.split(' | ')[0];
+          document.getElementById('excel-size').textContent = "Will be fetched directly from quote tool";
+          document.getElementById('quote_excel').value = ''; // clear any manual upload
+        } else {
+          document.getElementById('excel-content').style.display = 'flex';
+          document.getElementById('excel-preview').style.display = 'none';
+        }
+      });
     }
 
     if (btnLookup) {
