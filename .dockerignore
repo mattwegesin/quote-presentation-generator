@@ -7,7 +7,6 @@ venv/
 ENV/
 env/
 .DS_Store
-*.pptx
 *.xlsx
 *.xls
 *.pdf
