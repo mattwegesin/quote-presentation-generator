@@ -422,7 +422,7 @@ def generate():
 
                 if not gsa_quote_id:
                     logger.info(f"No existing GSA quote found for {property_code}. Creating one now.")
-                    gsa_quote_id = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly, room_count)
+                    gsa_quote_id = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly, room_count, gsa_meeting)
                     if gsa_quote_id:
                         logger.info(f"Successfully created and approved GSA quote ID: {gsa_quote_id}")
                 else:
