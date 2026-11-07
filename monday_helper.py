@@ -66,8 +66,7 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token, gsa_
             "color_mm5zq7cg": {"label": "GSA ONLY"},
             "color_mm5w8ehb": {"label": "Gathering Info"},
             "status": {"label": "Sales"},
-            "color_mm65xpj1": {"label": "Active"},
-            "color_mm6sy6mm": {"label": "Contract Sent"}
+            "color_mm65xpj1": {"label": "Active"}
         }
         if gsa_quote_id:
             vals_dict["text_mm8v74nz"] = str(gsa_quote_id)
