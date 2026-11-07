@@ -453,7 +453,7 @@ def generate():
                             
                             from monday_helper import process_monday_gsa_duplicate_async
                             import threading
-                            threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token)).start()
+                            threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token, gsa_quote_id, total_monthly)).start()
             except Exception as e:
                 logger.error(f"Failed during GSA quote automation: {e}")
 
@@ -980,7 +980,7 @@ def process_boldsign_webhook_async(event):
                     logger.info(f"Successfully updated GSA Monday item {monday_item_id} to Contract Signed.")
                     
                     # Poll for automated subitems and mark specific ones as Done
-                    target_subitem_names = ["Send GSA Contract", "Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
+                    target_subitem_names = ["Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
                     subitems_to_update = []
                     max_auto_retries = 15
                     
