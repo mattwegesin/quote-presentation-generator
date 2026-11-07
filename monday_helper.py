@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token):
+def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token, gsa_quote_id=None, total_monthly=None):
     """Background task to clean up subitems and update status on a newly duplicated GSA Monday item."""
     board_id = "18424851511"
     monday_headers = {
@@ -61,14 +61,20 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token):
           change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
         }
         """
-        col_vals = json.dumps({
+        vals_dict = {
             "name": inn_code,
             "color_mm5zq7cg": {"label": "GSA ONLY"},
             "color_mm5w8ehb": {"label": "Gathering Info"},
             "status": {"label": "Sales"},
             "color_mm65xpj1": {"label": "Active"},
             "color_mm6sy6mm": {"label": "Contract Sent"}
-        })
+        }
+        if gsa_quote_id:
+            vals_dict["text_mm8v74nz"] = str(gsa_quote_id)
+        if total_monthly is not None:
+            vals_dict["numeric_mm8w91ec"] = total_monthly
+            
+        col_vals = json.dumps(vals_dict)
         
         update_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
             "query": update_query,
@@ -83,6 +89,54 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token):
         if "errors" in up_data:
             logger.error(f"Monday Update Duplicated GSA Item Error: {up_data['errors']}")
         else:
-            logger.info(f"Successfully moved and updated GSA item {new_item_id} (Status: Contract Sent).")
+            logger.info(f"Successfully moved and updated GSA item {new_item_id}.")
+            
+            # Poll for newly automated subitems and mark 'Send GSA Contract' as Done
+            target_subitem_name = "Send GSA Contract"
+            subitem_to_update = None
+            max_auto_retries = 15
+            
+            logger.info(f"Polling for automated subitems on GSA item {new_item_id}...")
+            for attempt in range(max_auto_retries):
+                sub_query = """
+                query ($itemId: [ID!]) {
+                  items (ids: $itemId) {
+                    subitems { id name }
+                  }
+                }
+                """
+                sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                    "query": sub_query,
+                    "variables": {"itemId": [new_item_id]}
+                })
+                try:
+                    current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                    # Check if the target subitem has been created
+                    found_target = next((sub for sub in current_subitems if sub.get('name') == target_subitem_name), None)
+                    if found_target:
+                        subitem_to_update = found_target
+                        break
+                except Exception:
+                    pass
+                time.sleep(3.0)
+                
+            if subitem_to_update:
+                logger.info(f"Found target subitem {target_subitem_name}. Marking as Done...")
+                update_sub_query = """
+                mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
+                  change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                }
+                """
+                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                    "query": update_sub_query,
+                    "variables": {
+                        "itemId": subitem_to_update['id'],
+                        "boardId": "18424851639",
+                        "colVals": json.dumps({"status": {"label": "Done"}})
+                    }
+                })
+            else:
+                logger.warning(f"Timed out waiting for automated subitem '{target_subitem_name}' to appear.")
+                
     except Exception as e:
         logger.error(f"Failed in process_monday_gsa_duplicate_async: {e}")
