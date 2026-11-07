@@ -100,7 +100,7 @@ def mark_quote_won(quote_id: str):
         print(f"Error marking quote as won: {e}")
         return False
 
-def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float):
+def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0):
     try:
         session = requests.Session()
         session.headers.update({
@@ -130,6 +130,7 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
             "packageID": "117", # GSA ONLY (US)
             "propertyHotelCode": inn_code,
             "propertyName": property_name or f"{inn_code} GSA",
+            "numRooms": str(room_count),
             "submitNewQuote": "Create"
         }
         create_res = session.post(create_url, data=create_payload)
