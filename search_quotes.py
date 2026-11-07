@@ -220,7 +220,7 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
                     
             data['submitUpdateQuote'] = "Update Quote"
             session.post(admin_url, data=data)
-
+            
             # 3. Mark the initial status as Complete
             status_url = f"https://quote.hospitalitytechnologies.com/access/customerView.php?id={quote_id}"
             status_payload = {

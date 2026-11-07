@@ -41,15 +41,22 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
         "{{NOTES}}": notes or "",
         "{{EIN}}": "" # User left blank
     }
-    
     doc = Document(template_path)
-    
+
     # Use python_docx_replace to cleanly replace text across runs without destroying styling
+    from python_docx_replace.paragraph import Paragraph
     for p in Paragraph.get_all(doc):
         paragraph = Paragraph(p)
         for key, value in replacements.items():
             paragraph.replace_key(key, str(value))
-    
+            
+    # Fallback: For split tags (like {{NOTES}}) that replace_key misses, modify the paragraph directly
+    for p in doc.paragraphs:
+        for key, value in replacements.items():
+            if key in p.text:
+                p.text = p.text.replace(key, str(value))
+
+    # Save to a temporary DOCX file
     # Convert docx to PDF using LibreOffice headless
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_docx = os.path.join(temp_dir, "temp_gsa.docx")
