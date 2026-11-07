@@ -100,7 +100,7 @@ def mark_quote_won(quote_id: str):
         print(f"Error marking quote as won: {e}")
         return False
 
-def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0):
+def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0, meeting_fee: float = 0.0):
     try:
         session = requests.Session()
         session.headers.update({
@@ -149,7 +149,7 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
         if not quote_id:
             return None
             
-        # 2. Update the price of the first item to the GSA Total
+        # 2. Update the prices and meeting room qty
         admin_url = f"https://quote.hospitalitytechnologies.com/access/admin_adminView.php?id={quote_id}"
         admin_res = session.get(admin_url)
         from bs4 import BeautifulSoup
@@ -178,14 +178,34 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
                         opts = select_tag.find_all('option')
                         if opts: data[name] = opts[0].get('value', '')
                         
-            # Find the first item to update its price
-            for key in data.keys():
-                if key.startswith('retail') and not key.startswith('retailExt'):
-                    data[key] = str(total_monthly)
-                if key.startswith('retailExt'):
-                    data[key] = str(total_monthly)
+            # Find the items
+            first_item_id = None
+            meeting_item_id = None
+            for inp in form.find_all('input'):
+                if inp.get('name', '').startswith('qty'):
+                    tr = inp.find_parent('tr')
+                    if tr:
+                        if 'Meeting Rooms' in tr.text:
+                            meeting_item_id = inp.get('name').replace('qty', '')
+                        elif not first_item_id:
+                            first_item_id = inp.get('name').replace('qty', '')
+                            
+            if first_item_id:
+                # Set first item to total_monthly - meeting_fee
+                base_fee = total_monthly - meeting_fee
+                data[f'retail{first_item_id}'] = str(base_fee)
+                data[f'retailExt{first_item_id}'] = str(base_fee)
+                data[f'cost{first_item_id}'] = str(base_fee)
+                data[f'costExt{first_item_id}'] = str(base_fee)
+                
+            if meeting_item_id and meeting_fee > 0:
+                data[f'qty{meeting_item_id}'] = "1"
+                data[f'cost{meeting_item_id}'] = str(meeting_fee)
+                data[f'costExt{meeting_item_id}'] = str(meeting_fee)
+                data[f'retail{meeting_item_id}'] = str(meeting_fee)
+                data[f'retailExt{meeting_item_id}'] = str(meeting_fee)
                     
-            data['submitUpdatePrices'] = "Update Prices"
+            data['submitUpdateQuote'] = "Update Quote"
             session.post(admin_url, data=data)
         
         return quote_id
