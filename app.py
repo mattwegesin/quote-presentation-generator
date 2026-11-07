@@ -408,6 +408,7 @@ def generate():
             )
 
             # Check for existing GSA quote and create if missing
+            new_gsa_monday_id = None
             try:
                 from search_quotes import get_quotes_by_inn_code, create_and_approve_gsa_quote
                 existing_quotes = get_quotes_by_inn_code(property_code)
@@ -427,6 +428,32 @@ def generate():
                         logger.info(f"Successfully created and approved GSA quote ID: {gsa_quote_id}")
                 else:
                     logger.info(f"GSA quote already exists: ID {gsa_quote_id}. Skipping creation.")
+                    
+                # Duplicate the Monday item for GSA synchronously to grab ID, then finish async
+                if monday_item_id and gsa_quote_id:
+                    monday_token = os.environ.get("MONDAY_API_TOKEN")
+                    if monday_token:
+                        monday_headers = {
+                            "Authorization": monday_token,
+                            "API-Version": "2024-01",
+                            "Content-Type": "application/json"
+                        }
+                        dup_query = """
+                        mutation ($itemId: ID!) {
+                          duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
+                            id
+                          }
+                        }
+                        """
+                        dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
+                        dup_data = dup_resp.json()
+                        if "errors" not in dup_data:
+                            new_gsa_monday_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
+                            logger.info(f"Successfully duplicated item to new GSA item {new_gsa_monday_id}")
+                            
+                            from monday_helper import process_monday_gsa_duplicate_async
+                            import threading
+                            threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token)).start()
             except Exception as e:
                 logger.error(f"Failed during GSA quote automation: {e}")
 
@@ -473,7 +500,9 @@ def generate():
         # ---------------------------------------------------------
         if generate_gsa and gsa_bs_stream:
             gsa_title_str = f"Guest Service Agreement - {property_code}"
-            if monday_item_id:
+            if new_gsa_monday_id:
+                gsa_title_str += f" | ID:{new_gsa_monday_id}"
+            elif monday_item_id:
                 gsa_title_str += f" | ID:{monday_item_id}"
             if gsa_quote_id:
                 gsa_title_str += f" | QID:{gsa_quote_id}"
@@ -930,146 +959,76 @@ def process_boldsign_webhook_async(event):
             except Exception as e:
                 logger.error(f"Failed to parse Monday mutation response: {e}")
         else:
-            # Duplicate the existing item for GSA, move to Opportunities, and update specific columns
-            dup_query = """
-            mutation ($itemId: ID!) {
-              duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
+            # Update Status to Contract Signed for GSA
+            mutation = """
+            mutation ($itemId: ID!, $boardId: ID!) {
+              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\"label\":\"Contract Signed\"}") {
                 id
               }
             }
             """
-            dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
+            mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                "query": mutation,
+                "variables": {"itemId": monday_item_id, "boardId": board_id}
+            })
             
             try:
-                dup_data = dup_resp.json()
-                if "errors" in dup_data:
-                    logger.error(f"Monday Duplicate Error: {dup_data['errors']}")
+                mut_data = mut_resp.json()
+                if "errors" in mut_data:
+                    logger.error(f"Monday Mutation Error: {mut_data['errors']}")
                 else:
-                    new_item_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
-                    logger.info(f"Successfully duplicated item to new GSA item {new_item_id}")
+                    logger.info(f"Successfully updated GSA Monday item {monday_item_id} to Contract Signed.")
                     
-                    # Clean up subitems from the duplicated item FIRST (before status changes trigger automations)
-                    # Monday's duplicate API is async, so subitems might take a few seconds to appear
-                    subitems = []
-                    max_retries = 12
+                    # Poll for automated subitems and mark specific ones as Done
+                    target_subitem_names = ["Send GSA Contract", "Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
+                    subitems_to_update = []
+                    max_auto_retries = 15
                     
-                    for attempt in range(max_retries):
+                    logger.info(f"Polling for automated subitems on GSA item {monday_item_id}...")
+                    import time
+                    for attempt in range(max_auto_retries):
                         sub_query = """
                         query ($itemId: [ID!]) {
                           items (ids: $itemId) {
-                            subitems { id }
+                            subitems { id name }
                           }
                         }
                         """
                         sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
                             "query": sub_query,
-                            "variables": {"itemId": [new_item_id]}
+                            "variables": {"itemId": [monday_item_id]}
                         })
                         try:
-                            subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                            if subitems:
-                                break # Found them!
+                            current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                            found_targets = [sub for sub in current_subitems if sub.get('name') in target_subitem_names]
+                            if len(found_targets) >= len(target_subitem_names):
+                                subitems_to_update = found_targets
+                                break
                         except Exception:
                             pass
-                        time.sleep(2.5) # Wait 2.5 seconds and try again
+                        time.sleep(2.0)
                         
-                    if subitems:
-                        logger.info(f"Found {len(subitems)} subitems on duplicated item after retries. Deleting them to start clean...")
-                        # Batch the subitem deletion mutations to speed up API requests immensely
-                        del_mutations = []
-                        for idx, sub in enumerate(subitems):
-                            del_mutations.append(f"del{idx}: delete_item (item_id: {sub['id']}) {{ id }}")
-                        
-                        # Monday GraphQL max complexity allows many mutations, but let's chunk it to be safe (e.g., 30 per request)
-                        chunk_size = 30
-                        for i in range(0, len(del_mutations), chunk_size):
-                            chunk = del_mutations[i:i + chunk_size]
-                            del_query = "mutation { " + " ".join(chunk) + " }"
-                            requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": del_query})
-                    else:
-                        logger.info("No subitems found on duplicated item after waiting. Proceeding.")
-                        
-                    # Now apply the requested GSA specific column overrides and move group
-                    update_query = """
-                    mutation ($itemId: ID!, $boardId: ID!, $group: String!, $colVals: JSON!) {
-                      move_item_to_group (item_id: $itemId, group_id: $group) { id }
-                      change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
-                    }
-                    """
-                    col_vals = json.dumps({
-                        "name": inn_code,
-                        "color_mm5zq7cg": {"label": "GSA ONLY"},
-                        "color_mm5w8ehb": {"label": "Gathering Info"},
-                        "status": {"label": "Sales"},
-                        "color_mm65xpj1": {"label": "Active"},
-                        "color_mm6sy6mm": {"label": "Contract Signed"}
-                    })
-                    
-                    update_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                        "query": update_query,
-                        "variables": {
-                            "itemId": new_item_id,
-                            "boardId": board_id,
-                            "group": "topics",
-                            "colVals": col_vals
-                        }
-                    })
-                    up_data = update_resp.json()
-                    if "errors" in up_data:
-                        logger.error(f"Monday Update Duplicated Item Error: {up_data['errors']}")
-                    else:
-                        logger.info(f"Successfully moved and updated GSA item {new_item_id} in Opportunities.")
-                        
-                        # Poll for newly automated subitems and mark specific ones as Done
-                        target_subitem_names = ["Send GSA Contract", "Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
-                        subitems_to_update = []
-                        max_auto_retries = 15
-                        
-                        logger.info(f"Polling for automated subitems on GSA item {new_item_id}...")
-                        for attempt in range(max_auto_retries):
-                            sub_query = """
-                            query ($itemId: [ID!]) {
-                              items (ids: $itemId) {
-                                subitems { id name }
-                              }
+                    if subitems_to_update:
+                        logger.info(f"Found {len(subitems_to_update)} target subitems. Marking as Done...")
+                        for sub in subitems_to_update:
+                            update_sub_query = """
+                            mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
+                              change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
                             }
                             """
-                            sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                "query": sub_query,
-                                "variables": {"itemId": [new_item_id]}
-                            })
-                            try:
-                                current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                                # Check if the target subitems have been created
-                                found_targets = [sub for sub in current_subitems if sub.get('name') in target_subitem_names]
-                                if len(found_targets) >= len(target_subitem_names):
-                                    subitems_to_update = found_targets
-                                    break
-                            except Exception:
-                                pass
-                            time.sleep(2.0)
-                            
-                        if subitems_to_update:
-                            logger.info(f"Found {len(subitems_to_update)} target subitems. Marking as Done...")
-                            for sub in subitems_to_update:
-                                update_sub_query = """
-                                mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
-                                  change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                            requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                "query": update_sub_query,
+                                "variables": {
+                                    "itemId": sub['id'],
+                                    "boardId": "18424851639",
+                                    "colVals": json.dumps({"status": {"label": "Done"}})
                                 }
-                                """
-                                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                    "query": update_sub_query,
-                                    "variables": {
-                                        "itemId": sub['id'],
-                                        "boardId": "18424851639",
-                                        "colVals": json.dumps({"status": {"label": "Done"}})
-                                    }
-                                })
-                        else:
-                            logger.warning("Timed out waiting for automated subitems to appear.")
+                            })
+                    else:
+                        logger.warning("Timed out waiting for automated subitems to appear.")
                         
             except Exception as e:
-                logger.error(f"Failed to parse Monday duplicate/update response: {e}")
+                logger.error(f"Failed to parse Monday mutation response: {e}")
 
         # Fetch the Files (SharePoint) link
         query = """
