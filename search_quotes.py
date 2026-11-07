@@ -187,15 +187,6 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
             data['submitUpdatePrices'] = "Update Prices"
             session.post(admin_url, data=data)
         
-        # 3. Mark as Won
-        url = f"https://quote.hospitalitytechnologies.com/access/customerView.php?id={quote_id}"
-        payload = {
-            "id": quote_id,
-            "status": "Won",
-            "submitStatusUpdate": "Update Status"
-        }
-        session.post(url, data=payload)
-        
         return quote_id
     except Exception as e:
         print(f"Error creating GSA quote: {e}")

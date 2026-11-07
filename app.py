@@ -475,7 +475,9 @@ def generate():
             gsa_title_str = f"Guest Service Agreement - {property_code}"
             if monday_item_id:
                 gsa_title_str += f" | ID:{monday_item_id}"
-                
+            if gsa_quote_id:
+                gsa_title_str += f" | QID:{gsa_quote_id}"
+
             gsa_data = {
                 'Title': gsa_title_str,
                 'ExpiryDays': '180',
@@ -887,6 +889,14 @@ def process_boldsign_webhook_async(event):
             inn_code = message_title.split(" - ")[1].split(" | ID:")[0].strip().upper()
 
         is_gsa = "Guest Service Agreement" in message_title
+        
+        if internal_quote_id:
+            logger.info(f"Background Thread: Marking internal Quote {internal_quote_id} as WON.")
+            success = mark_quote_won(internal_quote_id)
+            if success:
+                logger.info(f"Successfully updated internal Quote {internal_quote_id} to WON.")
+            else:
+                logger.error(f"Failed to update internal Quote {internal_quote_id} to WON.")
 
         # 2. Update Monday.com Status and Extract SharePoint Link
         monday_token = os.environ.get("MONDAY_API_TOKEN")
@@ -919,15 +929,6 @@ def process_boldsign_webhook_async(event):
                     logger.info(f"Successfully updated Monday item {monday_item_id} to WON.")
             except Exception as e:
                 logger.error(f"Failed to parse Monday mutation response: {e}")
-
-            # Also update internal Quote Tool to WON if we have the Quote ID
-            if internal_quote_id:
-                logger.info(f"Marking internal Quote {internal_quote_id} as WON.")
-                success = mark_quote_won(internal_quote_id)
-                if success:
-                    logger.info(f"Successfully updated internal Quote {internal_quote_id} to WON.")
-                else:
-                    logger.error(f"Failed to update internal Quote {internal_quote_id} to WON.")
         else:
             # Duplicate the existing item for GSA, move to Opportunities, and update specific columns
             dup_query = """
