@@ -105,4 +105,4 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
         pdf_doc.close()
         
     output_stream.seek(0)
-    return output_stream
+    return output_stream, total_monthly

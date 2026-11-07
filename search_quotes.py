@@ -100,6 +100,107 @@ def mark_quote_won(quote_id: str):
         print(f"Error marking quote as won: {e}")
         return False
 
+def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float):
+    try:
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
+        login_url = "https://quote.hospitalitytechnologies.com/index.php"
+        
+        login_payload = {
+            "username": "api_user",
+            "password": "H0spTech123!",
+            "submitLogin": "1"
+        }
+        response = session.post(login_url, data=login_payload, allow_redirects=False)
+        
+        if response.status_code == 200 and "loginVerify2FA.php" in response.text:
+            totp_url = "https://quote.hospitalitytechnologies.com/loginVerify2FA.php"
+            secret = "K4OT5KIPWD3IFEBB"
+            verify_payload = {
+                "otp": pyotp.TOTP(secret).now(),
+                "otpSubmit": " Verify 2FA "
+            }
+            session.post(totp_url, data=verify_payload, allow_redirects=False)
+            
+        # 1. Create Quote
+        create_url = "https://quote.hospitalitytechnologies.com/access/buildQuote.php"
+        create_payload = {
+            "packageID": "117", # GSA ONLY (US)
+            "propertyHotelCode": inn_code,
+            "propertyName": property_name or f"{inn_code} GSA",
+            "submitNewQuote": "Create"
+        }
+        create_res = session.post(create_url, data=create_payload)
+        
+        quote_id = None
+        if 'id=' in create_res.url:
+            quote_id = create_res.url.split('id=')[1].split('&')[0]
+        else:
+            import re
+            match = re.search(r'location=\'([^\']+)\'', create_res.text)
+            if match:
+                redirect_url = match.group(1)
+                if 'id=' in redirect_url:
+                    quote_id = redirect_url.split('id=')[1].split('&')[0]
+
+        if not quote_id:
+            return None
+            
+        # 2. Update the price of the first item to the GSA Total
+        admin_url = f"https://quote.hospitalitytechnologies.com/access/admin_adminView.php?id={quote_id}"
+        admin_res = session.get(admin_url)
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(admin_res.text, 'html.parser')
+        form = soup.find('form', id='adminForm')
+        if form:
+            data = {}
+            for input_tag in form.find_all('input'):
+                name = input_tag.get('name')
+                if not name: continue
+                type_attr = input_tag.get('type', 'text').lower()
+                value = input_tag.get('value', '')
+                if type_attr in ('checkbox', 'radio'):
+                    if input_tag.has_attr('checked'):
+                        data[name] = value
+                elif type_attr not in ('submit', 'button'):
+                    data[name] = value
+                    
+            for select_tag in form.find_all('select'):
+                name = select_tag.get('name')
+                if name:
+                    selected = select_tag.find('option', selected=True)
+                    if selected:
+                        data[name] = selected.get('value', '')
+                    else:
+                        opts = select_tag.find_all('option')
+                        if opts: data[name] = opts[0].get('value', '')
+                        
+            # Find the first item to update its price
+            for key in data.keys():
+                if key.startswith('retail') and not key.startswith('retailExt'):
+                    data[key] = str(total_monthly)
+                if key.startswith('retailExt'):
+                    data[key] = str(total_monthly)
+                    
+            data['submitUpdatePrices'] = "Update Prices"
+            session.post(admin_url, data=data)
+        
+        # 3. Mark as Won
+        url = f"https://quote.hospitalitytechnologies.com/access/customerView.php?id={quote_id}"
+        payload = {
+            "id": quote_id,
+            "status": "Won",
+            "submitStatusUpdate": "Update Status"
+        }
+        session.post(url, data=payload)
+        
+        return quote_id
+    except Exception as e:
+        print(f"Error creating GSA quote: {e}")
+        return None
+
 if __name__ == "__main__":
     inn_code = "TEST123"
     results = get_quotes_by_inn_code(inn_code)

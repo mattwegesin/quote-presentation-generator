@@ -376,7 +376,7 @@ def generate():
             template_path = os.path.join(os.path.dirname(__file__), "GSA_TAGS.docx")
             
             # Generate GSA for BoldSign (No CTA Button)
-            gsa_bs_stream = generate_gsa_docx_to_pdf(
+            gsa_bs_stream, total_monthly = generate_gsa_docx_to_pdf(
                 template_path=template_path,
                 property_code=property_code,
                 signer_name=signer_name,
@@ -390,9 +390,9 @@ def generate():
                 notes=gsa_notes,
                 for_boldsign=True
             )
-            
+
             # Generate GSA for Client (Has CTA Button)
-            gsa_client_stream = generate_gsa_docx_to_pdf(
+            gsa_client_stream, _ = generate_gsa_docx_to_pdf(
                 template_path=template_path,
                 property_code=property_code,
                 signer_name=signer_name,
@@ -406,6 +406,29 @@ def generate():
                 notes=gsa_notes,
                 for_boldsign=False
             )
+
+            # Check for existing GSA quote and create if missing
+            try:
+                from search_quotes import get_quotes_by_inn_code, create_and_approve_gsa_quote
+                existing_quotes = get_quotes_by_inn_code(property_code)
+                gsa_quote_id = None
+                for q in existing_quotes:
+                    if "GSA ONLY" in q.get("package", "").upper():
+                        if q.get("links") and len(q["links"]) > 0:
+                            match = [l for l in q["links"] if "customerView.php?id=" in l]
+                            if match:
+                                gsa_quote_id = match[0].split("id=")[1].split("&")[0]
+                        break
+
+                if not gsa_quote_id:
+                    logger.info(f"No existing GSA quote found for {property_code}. Creating one now.")
+                    gsa_quote_id = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly)
+                    if gsa_quote_id:
+                        logger.info(f"Successfully created and approved GSA quote ID: {gsa_quote_id}")
+                else:
+                    logger.info(f"GSA quote already exists: ID {gsa_quote_id}. Skipping creation.")
+            except Exception as e:
+                logger.error(f"Failed during GSA quote automation: {e}")
 
         # ---------------------------------------------------------
         # SEND PROPOSAL TO BOLDSIGN
