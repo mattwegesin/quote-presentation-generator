@@ -134,6 +134,17 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token, gsa_
                         "colVals": json.dumps({"status": {"label": "Done"}})
                     }
                 })
+                
+                # Now set main status to Contract Sent
+                logger.info("Setting main item status to Contract Sent.")
+                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                    "query": update_sub_query,
+                    "variables": {
+                        "itemId": new_item_id,
+                        "boardId": board_id,
+                        "colVals": json.dumps({"color_mm6sy6mm": {"label": "Contract Sent"}})
+                    }
+                })
             else:
                 logger.warning(f"Timed out waiting for automated subitem '{target_subitem_name}' to appear.")
                 
