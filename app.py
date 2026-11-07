@@ -235,7 +235,7 @@ def generate():
         # ---------------------------------------------------------
         # GENERATE FOR BOLDSIGN (No CTA Button, Has Signature Lines)
         # ---------------------------------------------------------
-        output_stream_bs, target_page = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True, signer_name=signer_name)
+        output_stream_bs, target_page, grand_total = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True, signer_name=signer_name)
         output_stream_bs.seek(0)
         pdf_stream_bs = convert_pptx_to_pdf(output_stream_bs)
 
@@ -244,9 +244,44 @@ def generate():
         # ---------------------------------------------------------
         pptx_stream.seek(0)
         excel_stream.seek(0)
-        output_stream_client, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name)
+        output_stream_client, _, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name)
         output_stream_client.seek(0)
         pdf_stream_client = convert_pptx_to_pdf(output_stream_client)
+
+        if monday_item_id and quote_num != "UNKNOWN":
+            logger.info(f"Updating Monday.com item {monday_item_id} with quote number and total.")
+            monday_token = os.environ.get("MONDAY_API_TOKEN")
+            if monday_token:
+                mutation = """
+                mutation ($itemId: ID!, $boardId: ID!, $colValues: JSON!) {
+                  change_multiple_column_values(item_id: $itemId, board_id: $boardId, column_values: $colValues) {
+                    id
+                  }
+                }
+                """
+                col_vals = {
+                    "text_mm8v74nz": quote_num,
+                    "numeric_mm8vcbpj": grand_total
+                }
+                try:
+                    import json
+                    headers_mon = {
+                        "Authorization": monday_token,
+                        "API-Version": "2024-01",
+                        "Content-Type": "application/json"
+                    }
+                    resp_mon = requests.post("https://api.monday.com/v2", headers=headers_mon, json={
+                        "query": mutation,
+                        "variables": {
+                            "itemId": monday_item_id,
+                            "boardId": "18424851511",
+                            "colValues": json.dumps(col_vals)
+                        }
+                    })
+                    if "errors" in resp_mon.json():
+                        logger.error(f"Error updating Monday quote columns: {resp_mon.json()['errors']}")
+                except Exception as e:
+                    logger.error(f"Failed to update Monday quote columns: {e}")
 
         # Send to BoldSign
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")

@@ -704,15 +704,15 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
         out_stream = io.BytesIO()
         prs.save(out_stream)
         out_stream.seek(0)
-        return out_stream, target_page
+        return out_stream, target_page, grand_total
     elif isinstance(output_target, (str, bytes, os.PathLike)):
         prs.save(output_target)
-        return output_target, target_page
+        return output_target, target_page, grand_total
     else:
         prs.save(output_target)
         if hasattr(output_target, 'seek'):
             output_target.seek(0)
-        return output_target, target_page
+        return output_target, target_page, grand_total
 
 def main(pptx_path=None, excel_path=None, output_filename=None):
     if pptx_path is None:
