@@ -413,17 +413,19 @@ def generate():
                 from search_quotes import get_quotes_by_inn_code, create_and_approve_gsa_quote
                 existing_quotes = get_quotes_by_inn_code(property_code)
                 gsa_quote_id = None
+                visible_gsa_quote_num = None
                 for q in existing_quotes:
                     if "GSA ONLY" in q.get("package", "").upper():
                         if q.get("links") and len(q["links"]) > 0:
                             match = [l for l in q["links"] if "customerView.php?id=" in l]
                             if match:
                                 gsa_quote_id = match[0].split("id=")[1].split("&")[0]
+                                visible_gsa_quote_num = q.get("job", "").replace("#", "").strip()
                         break
 
                 if not gsa_quote_id:
                     logger.info(f"No existing GSA quote found for {property_code}. Creating one now.")
-                    gsa_quote_id = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly, room_count, gsa_meeting, gsa_notes)
+                    gsa_quote_id, visible_gsa_quote_num = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly, room_count, gsa_meeting, gsa_notes)
                     if gsa_quote_id:
                         logger.info(f"Successfully created and approved GSA quote ID: {gsa_quote_id}")
                 else:
@@ -453,7 +455,7 @@ def generate():
                             
                             from monday_helper import process_monday_gsa_duplicate_async
                             import threading
-                            threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token, gsa_quote_id, total_monthly)).start()
+                            threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token, visible_gsa_quote_num, total_monthly)).start()
             except Exception as e:
                 logger.error(f"Failed during GSA quote automation: {e}")
 

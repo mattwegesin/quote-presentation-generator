@@ -147,13 +147,23 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
                     quote_id = redirect_url.split('id=')[1].split('&')[0]
 
         if not quote_id:
-            return None
+            return None, None
             
         # 2. Update the prices and meeting room qty
         admin_url = f"https://quote.hospitalitytechnologies.com/access/admin_adminView.php?id={quote_id}"
         admin_res = session.get(admin_url)
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(admin_res.text, 'html.parser')
+        
+        # Extract visible Quote Number (e.g. 28341) from the header
+        visible_quote_num = None
+        header_td = soup.find(lambda tag: tag.name == 'td' and 'Configure Quote' in tag.text)
+        if header_td:
+            import re
+            q_match = re.search(r'#(\d+)', header_td.text)
+            if q_match:
+                visible_quote_num = q_match.group(1)
+
         form = soup.find('form', id='adminForm')
         if form:
             data = {}
@@ -230,10 +240,10 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
             }
             session.post(status_url, data=status_payload)
 
-            return quote_id
+        return quote_id, visible_quote_num
     except Exception as e:
         print(f"Error creating GSA quote: {e}")
-        return None
+        return None, None
 
 if __name__ == "__main__":
     inn_code = "TEST123"
