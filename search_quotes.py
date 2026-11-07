@@ -100,7 +100,7 @@ def mark_quote_won(quote_id: str):
         print(f"Error marking quote as won: {e}")
         return False
 
-def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0, meeting_fee: float = 0.0):
+def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0, meeting_fee: float = 0.0, notes: str = ""):
     try:
         session = requests.Session()
         session.headers.update({
@@ -177,6 +177,19 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
                     else:
                         opts = select_tag.find_all('option')
                         if opts: data[name] = opts[0].get('value', '')
+                        
+            for textarea_tag in form.find_all('textarea'):
+                name = textarea_tag.get('name')
+                if name:
+                    data[name] = textarea_tag.text.strip()
+            
+            if notes:
+                # Append to existing notes or replace
+                existing_notes = data.get('quoteNotes', '')
+                if existing_notes:
+                    data['quoteNotes'] = existing_notes + "\n\n" + notes
+                else:
+                    data['quoteNotes'] = notes
                         
             # Find the items
             first_item_id = None
