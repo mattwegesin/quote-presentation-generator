@@ -961,6 +961,7 @@ def process_boldsign_webhook_async(event):
             except Exception as e:
                 logger.error(f"Failed to parse Monday mutation response: {e}")
         else:
+            try:
                     # 1. Find and mark "Contract Signed by Customer" as Done
                     sub_query = """
                     query ($itemId: [ID!]) {
