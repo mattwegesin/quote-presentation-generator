@@ -981,53 +981,70 @@ def process_boldsign_webhook_async(event):
                 else:
                     logger.info(f"Successfully updated GSA Monday item {monday_item_id} to Contract Signed.")
                     
-                    # Poll for automated subitems and mark specific ones as Done
-                    target_subitem_names = ["Contract Signed by Customer"]
-                    subitems_to_update = []
-                    max_auto_retries = 15
+                    # 1. Find and mark "Contract Signed by Customer" as Done
+                    sub_query = """
+                    query ($itemId: [ID!]) {
+                      items (ids: $itemId) {
+                        subitems { id name }
+                      }
+                    }
+                    """
+                    sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                        "query": sub_query,
+                        "variables": {"itemId": [monday_item_id]}
+                    })
+                    current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                    signed_subitem = next((s for s in current_subitems if s.get('name') == "Contract Signed by Customer"), None)
                     
-                    logger.info(f"Polling for automated subitems on GSA item {monday_item_id}...")
+                    update_sub_query = """
+                    mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
+                      change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                    }
+                    """
+                    if signed_subitem:
+                        logger.info("Marking 'Contract Signed by Customer' as Done...")
+                        requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": update_sub_query,
+                            "variables": {
+                                "itemId": signed_subitem['id'],
+                                "boardId": "18424851639",
+                                "colVals": json.dumps({"status": {"label": "Done"}})
+                            }
+                        })
+                    else:
+                        logger.warning("'Contract Signed by Customer' subitem not found.")
+                    
+                    # 2. Wait for "Upload Signed GSA to Sharepoint" to be created by the new automation, then mark it Done
                     import time
+                    max_auto_retries = 15
+                    logger.info("Polling for 'Upload Signed GSA to Sharepoint' subitem...")
+                    sp_subitem = None
                     for attempt in range(max_auto_retries):
-                        sub_query = """
-                        query ($itemId: [ID!]) {
-                          items (ids: $itemId) {
-                            subitems { id name }
-                          }
-                        }
-                        """
                         sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
                             "query": sub_query,
                             "variables": {"itemId": [monday_item_id]}
                         })
                         try:
                             current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                            found_targets = [sub for sub in current_subitems if sub.get('name') in target_subitem_names]
-                            if len(found_targets) >= len(target_subitem_names):
-                                subitems_to_update = found_targets
+                            sp_subitem = next((s for s in current_subitems if s.get('name') == "Upload Signed GSA to Sharepoint"), None)
+                            if sp_subitem:
                                 break
                         except Exception:
                             pass
-                        time.sleep(2.0)
+                        time.sleep(2.5)
                         
-                    if subitems_to_update:
-                        logger.info(f"Found {len(subitems_to_update)} target subitems. Marking as Done...")
-                        for sub in subitems_to_update:
-                            update_sub_query = """
-                            mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
-                              change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                    if sp_subitem:
+                        logger.info("Marking 'Upload Signed GSA to Sharepoint' as Done...")
+                        requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                            "query": update_sub_query,
+                            "variables": {
+                                "itemId": sp_subitem['id'],
+                                "boardId": "18424851639",
+                                "colVals": json.dumps({"status": {"label": "Done"}})
                             }
-                            """
-                            requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                                "query": update_sub_query,
-                                "variables": {
-                                    "itemId": sub['id'],
-                                    "boardId": "18424851639",
-                                    "colVals": json.dumps({"status": {"label": "Done"}})
-                                }
-                            })
+                        })
                     else:
-                        logger.warning("Timed out waiting for automated subitems to appear.")
+                        logger.warning("Timed out waiting for 'Upload Signed GSA to Sharepoint' subitem to appear.")
                         
             except Exception as e:
                 logger.error(f"Failed to parse Monday mutation response: {e}")
