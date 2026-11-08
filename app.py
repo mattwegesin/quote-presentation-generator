@@ -982,7 +982,7 @@ def process_boldsign_webhook_async(event):
                     logger.info(f"Successfully updated GSA Monday item {monday_item_id} to Contract Signed.")
                     
                     # Poll for automated subitems and mark specific ones as Done
-                    target_subitem_names = ["Contract Signed by Customer", "Upload Signed GSA to Sharepoint"]
+                    target_subitem_names = ["Contract Signed by Customer"]
                     subitems_to_update = []
                     max_auto_retries = 15
                     
