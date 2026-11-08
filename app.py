@@ -998,11 +998,12 @@ def process_boldsign_webhook_async(event):
                     else:
                         logger.warning("'Contract Signed by Customer' subitem not found.")
                     
-                    # 2. Wait for "Upload Signed GSA to Sharepoint" to be created by the new automation, then mark it Done
+                    # 2. Wait for post-signature subitems to be created by the new automation, then mark them Done
                     import time
                     max_auto_retries = 15
-                    logger.info("Polling for 'Upload Signed GSA to Sharepoint' subitem...")
+                    logger.info("Polling for post-signature subitems...")
                     sp_subitem = None
+                    won_subitem = None
                     for attempt in range(max_auto_retries):
                         sub_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
                             "query": sub_query,
@@ -1012,24 +1013,26 @@ def process_boldsign_webhook_async(event):
                             items_list2 = sub_resp.json().get('data', {}).get('items', [])
                             current_subitems2 = items_list2[0].get('subitems', []) if items_list2 else []
                             sp_subitem = next((s for s in current_subitems2 if s.get('name') == "Upload Signed GSA to Sharepoint"), None)
-                            if sp_subitem:
+                            won_subitem = next((s for s in current_subitems2 if s.get('name') == "Mark Status in Quote Tool as WON"), None)
+                            if sp_subitem or won_subitem:
                                 break
                         except Exception:
                             pass
                         time.sleep(2.5)
                         
-                    if sp_subitem:
-                        logger.info("Marking 'Upload Signed GSA to Sharepoint' as Done...")
-                        requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                            "query": update_sub_query,
-                            "variables": {
-                                "itemId": sp_subitem['id'],
-                                "boardId": "18424851639",
-                                "colVals": json.dumps({"status": {"label": "Done"}})
-                            }
-                        })
-                    else:
-                        logger.warning("Timed out waiting for 'Upload Signed GSA to Sharepoint' subitem to appear.")
+                    for sub_name, sub_obj in [("Upload Signed GSA to Sharepoint", sp_subitem), ("Mark Status in Quote Tool as WON", won_subitem)]:
+                        if sub_obj:
+                            logger.info(f"Marking '{sub_name}' as Done...")
+                            requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                "query": update_sub_query,
+                                "variables": {
+                                    "itemId": sub_obj['id'],
+                                    "boardId": "18424851639",
+                                    "colVals": json.dumps({"status": {"label": "Done"}})
+                                }
+                            })
+                        else:
+                            logger.warning(f"Timed out waiting for '{sub_name}' subitem to appear.")
                         
                     # 3. Finally Update Status to Contract Signed for GSA
                     mutation = """
