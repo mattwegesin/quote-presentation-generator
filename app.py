@@ -961,26 +961,6 @@ def process_boldsign_webhook_async(event):
             except Exception as e:
                 logger.error(f"Failed to parse Monday mutation response: {e}")
         else:
-            # Update Status to Contract Signed for GSA
-            mutation = """
-            mutation ($itemId: ID!, $boardId: ID!) {
-              change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\"label\":\"Contract Signed\"}") {
-                id
-              }
-            }
-            """
-            mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
-                "query": mutation,
-                "variables": {"itemId": monday_item_id, "boardId": board_id}
-            })
-            
-            try:
-                mut_data = mut_resp.json()
-                if "errors" in mut_data:
-                    logger.error(f"Monday Mutation Error: {mut_data['errors']}")
-                else:
-                    logger.info(f"Successfully updated GSA Monday item {monday_item_id} to Contract Signed.")
-                    
                     # 1. Find and mark "Contract Signed by Customer" as Done
                     sub_query = """
                     query ($itemId: [ID!]) {
@@ -993,7 +973,10 @@ def process_boldsign_webhook_async(event):
                         "query": sub_query,
                         "variables": {"itemId": [monday_item_id]}
                     })
-                    current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                    
+                    items_list = sub_resp.json().get('data', {}).get('items', [])
+                    current_subitems = items_list[0].get('subitems', []) if items_list else []
+                    
                     signed_subitem = next((s for s in current_subitems if s.get('name') == "Contract Signed by Customer"), None)
                     
                     update_sub_query = """
@@ -1025,8 +1008,9 @@ def process_boldsign_webhook_async(event):
                             "variables": {"itemId": [monday_item_id]}
                         })
                         try:
-                            current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                            sp_subitem = next((s for s in current_subitems if s.get('name') == "Upload Signed GSA to Sharepoint"), None)
+                            items_list2 = sub_resp.json().get('data', {}).get('items', [])
+                            current_subitems2 = items_list2[0].get('subitems', []) if items_list2 else []
+                            sp_subitem = next((s for s in current_subitems2 if s.get('name') == "Upload Signed GSA to Sharepoint"), None)
                             if sp_subitem:
                                 break
                         except Exception:
@@ -1046,8 +1030,29 @@ def process_boldsign_webhook_async(event):
                     else:
                         logger.warning("Timed out waiting for 'Upload Signed GSA to Sharepoint' subitem to appear.")
                         
+                    # 3. Finally Update Status to Contract Signed for GSA
+                    mutation = """
+                    mutation ($itemId: ID!, $boardId: ID!) {
+                      change_column_value(item_id: $itemId, board_id: $boardId, column_id: "color_mm6sy6mm", value: "{\\"label\\":\\"Contract Signed\\"}") {
+                        id
+                      }
+                    }
+                    """
+                    mut_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                        "query": mutation,
+                        "variables": {"itemId": monday_item_id, "boardId": board_id}
+                    })
+                    try:
+                        mut_data = mut_resp.json()
+                        if "errors" in mut_data:
+                            logger.error(f"Monday Mutation Error: {mut_data['errors']}")
+                        else:
+                            logger.info(f"Successfully updated GSA Monday item {monday_item_id} to Contract Signed.")
+                    except Exception as e:
+                        logger.error(f"Failed to parse Monday mutation response: {e}")
+                        
             except Exception as e:
-                logger.error(f"Failed to parse Monday mutation response: {e}")
+                logger.error(f"Failed in webhook subitem execution: {e}")
 
         # Fetch the Files (SharePoint) link
         query = """
