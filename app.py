@@ -580,51 +580,6 @@ def generate():
         flash(err_msg, "error")
         return redirect(url_for("index"))
 
-@app.route("/api/check_customer", methods=["POST"])
-@requires_auth
-def check_netsuite_customer():
-    """Checks NetSuite to see if a customer exists by Inn Code/Property Code."""
-    property_code = request.form.get("property_code", "").strip().upper()
-    if not property_code:
-        return jsonify({"error": "Property code required"}), 400
-        
-    try:
-        from requests_oauthlib import OAuth1
-    except ImportError:
-        logger.error("requests_oauthlib not installed")
-        return jsonify({"error": "OAuth library missing"}), 500
-
-    account = os.environ.get("NETSUITE_ACCOUNT_ID")
-    consumer_key = os.environ.get("NETSUITE_CONSUMER_KEY")
-    consumer_secret = os.environ.get("NETSUITE_CONSUMER_SECRET")
-    token_id = os.environ.get("NETSUITE_TOKEN_ID")
-    token_secret = os.environ.get("NETSUITE_TOKEN_SECRET")
-    
-    if not all([account, consumer_key, consumer_secret, token_id, token_secret]):
-        return jsonify({"error": "NetSuite credentials missing"}), 500
-
-    realm = account.upper()
-    oauth = OAuth1(consumer_key, client_secret=consumer_secret, resource_owner_key=token_id, resource_owner_secret=token_secret, signature_method='HMAC-SHA256', realm=realm)
-    
-    url_account = account.lower().replace("_", "-")
-    url = f"https://{url_account}.suitetalk.api.netsuite.com/services/rest/query/v1/suiteql"
-    
-    # Simple SuiteQL query
-    q = f"SELECT id FROM customer WHERE UPPER(entityid) LIKE UPPER('%{property_code}%') OR UPPER(companyname) LIKE UPPER('%{property_code}%')"
-    
-    try:
-        res = requests.post(url, headers={"Prefer": "transient"}, json={"q": q}, auth=oauth)
-        if res.status_code == 200:
-            data = res.json()
-            items = data.get("items", [])
-            return jsonify({"exists": len(items) > 0, "count": len(items)})
-        else:
-            logger.error(f"NetSuite API error: {res.status_code} {res.text}")
-            return jsonify({"error": "NetSuite API error"}), 500
-    except Exception as e:
-        logger.error(f"Failed to check NetSuite: {e}")
-        return jsonify({"error": str(e)}), 500
-
 @app.route("/sign/<property_code>", methods=["GET"])
 def sign_document(property_code):
     """Dynamic gateway redirecting to BoldSign embedded signing link."""

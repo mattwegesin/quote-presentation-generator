@@ -708,8 +708,18 @@
           </div>
         </div>
 
-        <div class="form-actions">
-          <button type="button" class="btn-submit" id="btnSubmit">
+        <div class="form-actions" style="display: flex; gap: 1rem; align-items: center;">
+          <button type="button" class="btn-secondary" id="btnAddGsa" style="padding: 1rem 1.5rem; font-size: 1rem; flex: 1; max-width: 250px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; vertical-align: middle;">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <line x1="9" y1="15" x2="15" y2="15"></line>
+            </svg>
+            <span id="btnGsaText">Add GSA Contract</span>
+          </button>
+          
+          <button type="button" class="btn-submit" id="btnSubmit" style="flex: 2;">
             <span class="spinner" id="spinner"></span>
             <svg id="download-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -718,7 +728,7 @@
             </svg>
             <span id="btnText">Generate Presentation</span>
           </button>
-          <div class="progress-bar-container" id="progressBar">
+          <div class="progress-bar-container" id="progressBar" style="width: 100%;">
             <div class="progress-bar-fill"></div>
           </div>
         </div>
@@ -758,20 +768,20 @@
   <div class="modal-overlay" id="gsaModal">
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-icon">
+        <div class="modal-icon" style="background-color: #0072CE; color: white;">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-            <line x1="12" y1="9" x2="12" y2="13"></line>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
           </svg>
         </div>
-        <h3 class="modal-title">New Customer Detected</h3>
+        <h3 class="modal-title">Configure GSA Contract</h3>
       </div>
       <div class="modal-body">
-        <p>This property (INN Code: <strong id="modalInnCode"></strong>) is not currently an active customer in NetSuite.</p>
-        <p style="margin-top: 0.75rem;">Would you like to automatically generate a Guest Service Agreement (GSA) alongside the proposal deck?</p>
+        <p>Configure the details for the Guest Service Agreement (GSA) below.</p>
         
-        <div class="modal-notes" id="gsaNotesSection">
+        <div class="modal-notes" id="gsaNotesSection" style="display: block; margin-top: 1.5rem;">
           <div style="margin-bottom: 1rem;">
             <label for="gsaTermInput">Agreement Term (Years):</label>
             <input type="text" id="gsaTermInput" placeholder="e.g. 3 Years" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem;">
@@ -794,13 +804,9 @@
           <textarea id="gsaNotesInput" placeholder="e.g. Include addendum B, waiving installation fee..."></textarea>
         </div>
       </div>
-      <div class="modal-footer" id="modalButtons1">
-        <button class="btn-secondary" id="btnGsaNo">No, Skip GSA</button>
-        <button class="btn-primary" id="btnGsaYes">Yes, Create GSA</button>
-      </div>
-      <div class="modal-footer" id="modalButtons2" style="display: none;">
-        <button class="btn-secondary" id="btnGsaCancel">Cancel</button>
-        <button class="btn-primary" id="btnGsaConfirm">Confirm & Generate</button>
+      <div class="modal-footer" id="modalButtons2">
+        <button class="btn-secondary" id="btnGsaCancel">Cancel / Remove GSA</button>
+        <button class="btn-primary" id="btnGsaConfirm">Save GSA Details</button>
       </div>
     </div>
   </div>
@@ -909,12 +915,8 @@
     }
     
     const gsaModal = document.getElementById('gsaModal');
-    const modalInnCode = document.getElementById('modalInnCode');
-    const btnGsaNo = document.getElementById('btnGsaNo');
-    const btnGsaYes = document.getElementById('btnGsaYes');
-    const gsaNotesSection = document.getElementById('gsaNotesSection');
-    const modalButtons1 = document.getElementById('modalButtons1');
-    const modalButtons2 = document.getElementById('modalButtons2');
+    const btnAddGsa = document.getElementById('btnAddGsa');
+    const btnGsaText = document.getElementById('btnGsaText');
     const btnGsaCancel = document.getElementById('btnGsaCancel');
     const btnGsaConfirm = document.getElementById('btnGsaConfirm');
     const gsaNotesInput = document.getElementById('gsaNotesInput');
@@ -1057,11 +1059,12 @@
       });
     }
 
+    btnAddGsa.addEventListener('click', () => {
+      gsaModal.classList.add('active');
+    });
+
     function resetModal() {
       gsaModal.classList.remove('active');
-      gsaNotesSection.style.display = 'none';
-      modalButtons1.style.display = 'flex';
-      modalButtons2.style.display = 'none';
       gsaNotesInput.value = '';
       gsaTermInput.value = '';
       gsaMeetingInput.value = '0';
@@ -1071,20 +1074,12 @@
       formGsaTermInput.value = '';
       formGsaStudioInput.value = '';
       formGsaMeetingInput.value = '';
+      
+      btnGsaText.textContent = "Add GSA Contract";
+      btnAddGsa.style.backgroundColor = "";
+      btnAddGsa.style.color = "";
+      btnAddGsa.style.borderColor = "";
     }
-
-    btnGsaNo.addEventListener('click', (e) => {
-      e.preventDefault();
-      resetModal();
-      submitForm();
-    });
-
-    btnGsaYes.addEventListener('click', (e) => {
-      e.preventDefault();
-      gsaNotesSection.style.display = 'block';
-      modalButtons1.style.display = 'none';
-      modalButtons2.style.display = 'flex';
-    });
 
     btnGsaCancel.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1109,7 +1104,11 @@
       formGsaStudioInput.value = studioRadio ? studioRadio.value : 'NO';
       
       gsaModal.classList.remove('active');
-      submitForm();
+      
+      btnGsaText.textContent = "Edit GSA Contract";
+      btnAddGsa.style.backgroundColor = "#E0F2FE";
+      btnAddGsa.style.borderColor = "#0072CE";
+      btnAddGsa.style.color = "#0072CE";
     });
 
     btnSubmit.addEventListener('click', async (e) => {
@@ -1139,47 +1138,9 @@
       }
       
       flashContainer.innerHTML = '';
-      btnSubmit.disabled = true;
-      spinner.style.display = 'inline-block';
-      downloadIcon.style.display = 'none';
-      btnText.textContent = "Checking Customer...";
       
-      try {
-        // Step 1: Check NetSuite
-        const formData = new FormData();
-        formData.append('property_code', propertyCode);
-        
-        const response = await fetch('/api/check_customer', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!response.ok) {
-          // If NetSuite check fails (e.g. no creds), just proceed normally
-          console.warn("NetSuite check failed, proceeding without GSA prompt.");
-          submitForm();
-          return;
-        }
-
-        const data = await response.json();
-        
-        if (data.exists) {
-          // Customer exists, proceed normally
-          submitForm();
-        } else {
-          // Customer does NOT exist, show modal
-          btnSubmit.disabled = false;
-          spinner.style.display = 'none';
-          downloadIcon.style.display = 'inline-block';
-          btnText.textContent = "Generate Presentation";
-          
-          modalInnCode.textContent = propertyCode;
-          gsaModal.classList.add('active');
-        }
-      } catch (err) {
-        console.error("Error checking customer:", err);
-        submitForm(); // Proceed normally on network error
-      }
+      // Proceed directly to generation
+      submitForm();
     });
 
     async function submitForm() {
