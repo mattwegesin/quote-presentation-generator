@@ -248,7 +248,8 @@ def generate():
                 custom_notes = [note.strip() for note in fetched_notes.split('\n') if note.strip()]
 
         import concurrent.futures
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+        # Limit to 2 workers to prevent Out Of Memory (OOM) crashes in smaller Docker containers
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         
         # ---------------------------------------------------------
         # GENERATE FOR BOLDSIGN (No CTA Button, Has Signature Lines)
