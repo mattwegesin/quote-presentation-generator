@@ -414,6 +414,8 @@ def generate():
                 existing_quotes = get_quotes_by_inn_code(property_code)
                 gsa_quote_id = None
                 visible_gsa_quote_num = None
+                original_rep = None
+                
                 for q in existing_quotes:
                     if "GSA ONLY" in q.get("package", "").upper():
                         if q.get("links") and len(q["links"]) > 0:
@@ -421,11 +423,13 @@ def generate():
                             if match:
                                 gsa_quote_id = match[0].split("id=")[1].split("&")[0]
                                 visible_gsa_quote_num = q.get("job", "").replace("#", "").strip()
-                        break
+                    elif not original_rep:
+                        # Grab the assigned rep from the first non-GSA quote we find
+                        original_rep = q.get("assigned_rep")
 
                 if not gsa_quote_id:
-                    logger.info(f"No existing GSA quote found for {property_code}. Creating one now.")
-                    gsa_quote_id, visible_gsa_quote_num = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly, room_count, gsa_meeting, gsa_notes)
+                    logger.info(f"No existing GSA quote found for {property_code}. Creating one now. Assigning to: {original_rep}")
+                    gsa_quote_id, visible_gsa_quote_num = create_and_approve_gsa_quote(property_code, hotel_name, total_monthly, room_count, gsa_meeting, gsa_notes, sales_rep_name=original_rep)
                     if gsa_quote_id:
                         logger.info(f"Successfully created and approved GSA quote ID: {gsa_quote_id}")
                 else:

@@ -100,7 +100,7 @@ def mark_quote_won(quote_id: str):
         print(f"Error marking quote as won: {e}")
         return False
 
-def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0, meeting_fee: float = 0.0, notes: str = ""):
+def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthly: float, room_count: int = 0, meeting_fee: float = 0.0, notes: str = "", sales_rep_name: str = None):
     try:
         session = requests.Session()
         session.headers.update({
@@ -149,6 +149,28 @@ def create_and_approve_gsa_quote(inn_code: str, property_name: str, total_monthl
         if not quote_id:
             return None, None
             
+        # 1.5 Assign Sales Rep if provided
+        if sales_rep_name:
+            assign_url = f"https://quote.hospitalitytechnologies.com/access/admin_assignRep.php?id={quote_id}"
+            assign_res = session.get(assign_url)
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(assign_res.text, 'html.parser')
+            target_user_val = None
+            for select in soup.find_all('select'):
+                if select.get('name') == 'assignToUser':
+                    for opt in select.find_all('option'):
+                        opt_name = opt.text.split('\n')[0].strip()
+                        if opt_name.lower() == sales_rep_name.lower():
+                            target_user_val = opt.get('value')
+                            break
+            
+            if target_user_val:
+                session.post(assign_url, data={
+                    "id": quote_id,
+                    "assignToUser": target_user_val,
+                    "submitAssignUser": "Assign User"
+                })
+
         # 2. Update the prices and meeting room qty
         admin_url = f"https://quote.hospitalitytechnologies.com/access/admin_adminView.php?id={quote_id}"
         admin_res = session.get(admin_url)

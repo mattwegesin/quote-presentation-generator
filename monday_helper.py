@@ -18,7 +18,9 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token, gsa_
     try:
         # Clean up subitems from the duplicated item FIRST (before status changes trigger automations)
         subitems = []
-        max_retries = 12
+        max_retries = 15
+        last_count = -1
+        stable_polls = 0
         
         for attempt in range(max_retries):
             sub_query = """
@@ -33,9 +35,18 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token, gsa_
                 "variables": {"itemId": [new_item_id]}
             })
             try:
-                subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
-                if subitems:
-                    break
+                current_subitems = sub_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                current_count = len(current_subitems)
+                
+                if current_count > 0:
+                    if current_count == last_count:
+                        stable_polls += 1
+                        if stable_polls >= 2:
+                            subitems = current_subitems
+                            break
+                    else:
+                        stable_polls = 0
+                last_count = current_count
             except Exception:
                 pass
             time.sleep(2.5)
@@ -51,6 +62,31 @@ def process_monday_gsa_duplicate_async(new_item_id, inn_code, monday_token, gsa_
                 chunk = del_mutations[i:i + chunk_size]
                 del_query = "mutation { " + " ".join(chunk) + " }"
                 requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": del_query})
+                
+            # Verify deletion and delete any stragglers
+            for _ in range(5):
+                time.sleep(2.0)
+                check_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                    "query": sub_query,
+                    "variables": {"itemId": [new_item_id]}
+                })
+                try:
+                    remaining = check_resp.json().get('data', {}).get('items', [{}])[0].get('subitems', [])
+                    if not remaining:
+                        logger.info("Background Thread: Verified all subitems deleted.")
+                        break
+                    else:
+                        logger.warning(f"Background Thread: {len(remaining)} subitems still remain. Retrying delete...")
+                        del_mutations = []
+                        for idx, sub in enumerate(remaining):
+                            del_mutations.append(f"del{idx}: delete_item (item_id: {sub['id']}) {{ id }}")
+                        
+                        for i in range(0, len(del_mutations), chunk_size):
+                            chunk = del_mutations[i:i + chunk_size]
+                            del_query = "mutation { " + " ".join(chunk) + " }"
+                            requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": del_query})
+                except Exception:
+                    pass
         else:
             logger.info(f"Background Thread: No subitems found on duplicated GSA item {new_item_id} after waiting.")
             
