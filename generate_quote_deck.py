@@ -342,7 +342,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
         p2.font.color.rgb = slate_text
         
         # Add modern card background for the text
-        bg_shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(0.9), Inches(12.33), Inches(4.8))
+        bg_shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(0.9), Inches(12.33), Inches(5.0))
         bg_shape.fill.solid()
         bg_shape.fill.fore_color.rgb = RGBColor(248, 250, 252) # Slate 50
         bg_shape.line.color.rgb = RGBColor(203, 213, 225) # Slate 300
@@ -365,10 +365,14 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             p.space_after = Pt(8)
         return p
 
+    # Determine if notes need a dedicated slide
+    notes_text = "\n".join(custom_notes)
+    needs_dedicated_slide = len(notes_text) > 400 or len(custom_notes) > 4
+
     # --- SLIDE 0 (Optional): Custom Notes ---
-    if custom_notes:
+    if custom_notes and needs_dedicated_slide:
         slide0 = setup_slide("Acceptance: Notes")
-        tb_notes = slide0.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(11.8), Inches(4.6))
+        tb_notes = slide0.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(11.8), Inches(4.8))
         tf_notes = tb_notes.text_frame
         tf_notes.word_wrap = True
         for note in custom_notes:
@@ -378,20 +382,25 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     slide1 = setup_slide("Acceptance: Terms & Caveats")
     
     # Subtle Vertical Divider
-    div1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(6.4), Inches(1.2), Inches(0.02), Inches(4.2))
+    div1 = slide1.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(6.4), Inches(1.2), Inches(0.02), Inches(4.4))
     div1.fill.solid()
     div1.fill.fore_color.rgb = RGBColor(203, 213, 225)
     div1.line.color.rgb = RGBColor(203, 213, 225)
 
-    tb_left = slide1.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(5.4), Inches(4.6))
+    tb_left = slide1.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(5.4), Inches(4.8))
     tf_left = tb_left.text_frame
     tf_left.word_wrap = True
+
+    if custom_notes and not needs_dedicated_slide:
+        add_p(tf_left, "Notes", bold=True, center=True)
+        for note in custom_notes:
+            add_p(tf_left, note)
 
     add_p(tf_left, "Supply Chain & Pricing Disclaimer", bold=True, center=True)
     for term in legal_terms.get("supply_chain", []):
         add_p(tf_left, term)
 
-    tb_right = slide1.shapes.add_textbox(Inches(6.6), Inches(1.0), Inches(5.9), Inches(4.6))
+    tb_right = slide1.shapes.add_textbox(Inches(6.6), Inches(1.0), Inches(5.9), Inches(4.8))
     tf_right = tb_right.text_frame
     tf_right.word_wrap = True
 
