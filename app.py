@@ -523,7 +523,7 @@ def generate():
         ]
         pdf_stream_bs.seek(0)
 
-        title_str = f"Hospitality Technologies Agreement - {property_code}"
+        title_str = f"Refresh Proposal - {property_code}"
         if monday_item_id:
             title_str += f" | ID:{monday_item_id}"
         if internal_quote_id:
@@ -710,7 +710,7 @@ def sign_document(property_code):
         
     # Find the most recent matching document
     target_doc = None
-    target_title_prefix = f"Hospitality Technologies Agreement - {property_code}"
+    target_title_prefix = f"Refresh Proposal - {property_code}"
     for doc in docs:
         if doc.get("messageTitle", "").startswith(target_title_prefix) and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
             target_doc = doc

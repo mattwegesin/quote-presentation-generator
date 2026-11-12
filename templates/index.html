@@ -1651,7 +1651,7 @@
         } else {
           data.forEach(doc => {
             const tr = document.createElement('tr');
-            const created = new Date(doc.createdDate).toLocaleDateString();
+            const created = new Date(doc.createdDate * 1000).toLocaleDateString();
             
             let actionBtn = '';
             if (doc.status === 'InProgress') {
