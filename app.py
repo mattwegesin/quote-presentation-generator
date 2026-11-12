@@ -827,6 +827,10 @@ def get_boldsign_status(inn_code):
         # Format the response
         results = []
         for doc in docs:
+            # Strictly filter by the Inn Code provided since BoldSign's search is broad
+            if inn_code.upper() not in doc.get("messageTitle", "").upper():
+                continue
+                
             # Check signers if in progress to give better details
             signer_statuses = []
             if doc.get("status") == "InProgress":
