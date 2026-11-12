@@ -301,20 +301,6 @@ def generate():
                 except Exception as e:
                     logger.error(f"Failed to update Monday quote columns: {e}")
 
-        logger.info("Waiting for all PDF conversions to complete...")
-        pdf_stream_bs = future_main_bs.result()
-        pdf_stream_client = future_main_client.result()
-        
-        if generate_cabling and cabling_internal_quote_id and 'future_cabling_bs' in locals():
-            cabling_bs_stream = future_cabling_bs.result()
-            cabling_client_stream = future_cabling_client.result()
-            
-        if generate_gsa and 'future_gsa_bs' in locals():
-            gsa_bs_stream, total_monthly = future_gsa_bs.result()
-            gsa_client_stream, _ = future_gsa_client.result()
-            
-        executor.shutdown()
-
         # Send to BoldSign
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
         if not boldsign_api_key:
@@ -519,6 +505,20 @@ def generate():
                             threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token, visible_gsa_quote_num, total_monthly)).start()
             except Exception as e:
                 logger.error(f"Failed during GSA quote automation: {e}")
+
+        logger.info("Waiting for all PDF conversions to complete...")
+        pdf_stream_bs = future_main_bs.result()
+        pdf_stream_client = future_main_client.result()
+        
+        if generate_cabling and cabling_internal_quote_id and 'future_cabling_bs' in locals():
+            cabling_bs_stream = future_cabling_bs.result()
+            cabling_client_stream = future_cabling_client.result()
+            
+        if generate_gsa and 'future_gsa_bs' in locals():
+            gsa_bs_stream, total_monthly = future_gsa_bs.result()
+            gsa_client_stream, _ = future_gsa_client.result()
+            
+        executor.shutdown()
 
         # ---------------------------------------------------------
         # SEND PROPOSAL TO BOLDSIGN
