@@ -10,7 +10,7 @@ from flask import Flask, render_template, request, send_file, flash, redirect, u
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from generate_quote_deck import generate_presentation
-from search_quotes import get_quotes_by_inn_code, mark_quote_won
+from search_quotes import get_quotes_by_inn_code, mark_quote_won, get_quote_notes
 from download_quote import download_ihg_quote_xlsx
 
 # Load environment variables from .env if present
@@ -232,10 +232,16 @@ def generate():
         logger.info("Buffering Quote Excel file in memory: '%s'", secure_filename(excel_filename))
         excel_stream = io.BytesIO(quote_excel_file.read())
 
+        custom_notes = None
+        if internal_quote_id:
+            fetched_notes = get_quote_notes(internal_quote_id)
+            if fetched_notes:
+                custom_notes = [note.strip() for note in fetched_notes.split('\n') if note.strip()]
+
         # ---------------------------------------------------------
         # GENERATE FOR BOLDSIGN (No CTA Button, Has Signature Lines)
         # ---------------------------------------------------------
-        output_stream_bs, target_page, grand_total = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True, signer_name=signer_name)
+        output_stream_bs, target_page, grand_total = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True, signer_name=signer_name, custom_notes=custom_notes)
         output_stream_bs.seek(0)
         pdf_stream_bs = convert_pptx_to_pdf(output_stream_bs)
 
@@ -244,7 +250,7 @@ def generate():
         # ---------------------------------------------------------
         pptx_stream.seek(0)
         excel_stream.seek(0)
-        output_stream_client, _, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name)
+        output_stream_client, _, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name, custom_notes=custom_notes)
         output_stream_client.seek(0)
         pdf_stream_client = convert_pptx_to_pdf(output_stream_client)
 

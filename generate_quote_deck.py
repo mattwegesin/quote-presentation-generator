@@ -469,7 +469,7 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             link_url = f"https://quotepresentation.hospitalitytechnologies.com/sign/{property_code}"
             cta_pic.click_action.hyperlink.address = link_url
 
-def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False, signer_name=None):
+def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False, signer_name=None, custom_notes=None):
     """
     Generates the presentation deck by extracting quote figures from an Excel workbook
     and injecting formatted slides into a base PowerPoint presentation.
@@ -556,51 +556,52 @@ def generate_presentation(pptx_source, excel_source, property_code=None, output_
                 legal_terms[current_legal_section].append(line)
 
     # --- Extract custom notes ---
-    custom_notes = []
-    found_acceptance_block = False
-    notes_header_found = False
-    
-    import re
-    for i in range(len(df)):
-        if len(df.iloc[i]) < 2:
-            continue
-        col1 = str(df.iloc[i, 1]).strip() if pd.notna(df.iloc[i, 1]) else ""
-        col2 = str(df.iloc[i, 2]).strip() if len(df.iloc[i]) > 2 and pd.notna(df.iloc[i, 2]) else ""
+    if custom_notes is None:
+        custom_notes = []
+        found_acceptance_block = False
+        notes_header_found = False
         
-        if "Acceptance" in col1 and "Supply Chain" in col1:
-            found_acceptance_block = True
-            match = re.search(r"Acceptance\s*(.*?)\s*Supply Chain & Pricing Disclaimer", col1, re.IGNORECASE | re.DOTALL)
-            if match and match.group(1).strip():
-                note_text = match.group(1).strip()
-                if note_text.lower().startswith("notes:"):
-                    note_text = note_text[6:].strip()
-                elif note_text.lower().startswith("note:"):
-                    note_text = note_text[5:].strip()
-                if note_text:
-                    custom_notes.append(note_text)
-            continue
+        import re
+        for i in range(len(df)):
+            if len(df.iloc[i]) < 2:
+                continue
+            col1 = str(df.iloc[i, 1]).strip() if pd.notna(df.iloc[i, 1]) else ""
+            col2 = str(df.iloc[i, 2]).strip() if len(df.iloc[i]) > 2 and pd.notna(df.iloc[i, 2]) else ""
             
-        if found_acceptance_block:
-            lower_col1 = col1.lower()
-            if not col1 or "authorized signature" in lower_col1 or "printed name" in lower_col1 or "title" in lower_col1 or "date" in lower_col1 or "monthly lease" in lower_col1 or "confirmation of acceptance" in lower_col1:
+            if "Acceptance" in col1 and "Supply Chain" in col1:
+                found_acceptance_block = True
+                match = re.search(r"Acceptance\s*(.*?)\s*Supply Chain & Pricing Disclaimer", col1, re.IGNORECASE | re.DOTALL)
+                if match and match.group(1).strip():
+                    note_text = match.group(1).strip()
+                    if note_text.lower().startswith("notes:"):
+                        note_text = note_text[6:].strip()
+                    elif note_text.lower().startswith("note:"):
+                        note_text = note_text[5:].strip()
+                    if note_text:
+                        custom_notes.append(note_text)
                 continue
                 
-            if lower_col1 == "notes" or lower_col1 == "notes:":
-                notes_header_found = True
-                if col2:
-                    custom_notes.append(col2)
-            elif lower_col1.startswith("notes:") or lower_col1.startswith("note:"):
-                custom_notes.append(col1[col1.find(":")+1:].strip())
-            elif lower_col1.startswith("notes\n") or lower_col1.startswith("note\n") or lower_col1.startswith("notes\r") or lower_col1.startswith("note\r"):
-                # Handle cases where "Notes" and the actual note are on different lines within the same cell
-                lines = re.split(r'\r?\n', col1, maxsplit=1)
-                if len(lines) > 1 and lines[1].strip():
-                    for line in lines[1].split('\n'):
-                        if line.strip():
-                            custom_notes.append(line.strip())
-            elif notes_header_found:
-                custom_notes.append(col1)
-                notes_header_found = False
+            if found_acceptance_block:
+                lower_col1 = col1.lower()
+                if not col1 or "authorized signature" in lower_col1 or "printed name" in lower_col1 or "title" in lower_col1 or "date" in lower_col1 or "monthly lease" in lower_col1 or "confirmation of acceptance" in lower_col1:
+                    continue
+                    
+                if lower_col1 == "notes" or lower_col1 == "notes:":
+                    notes_header_found = True
+                    if col2:
+                        custom_notes.append(col2)
+                elif lower_col1.startswith("notes:") or lower_col1.startswith("note:"):
+                    custom_notes.append(col1[col1.find(":")+1:].strip())
+                elif lower_col1.startswith("notes\n") or lower_col1.startswith("note\n") or lower_col1.startswith("notes\r") or lower_col1.startswith("note\r"):
+                    # Handle cases where "Notes" and the actual note are on different lines within the same cell
+                    lines = re.split(r'\r?\n', col1, maxsplit=1)
+                    if len(lines) > 1 and lines[1].strip():
+                        for line in lines[1].split('\n'):
+                            if line.strip():
+                                custom_notes.append(line.strip())
+                elif notes_header_found:
+                    custom_notes.append(col1)
+                    notes_header_found = False
     # ----------------------------
 
     sections = []
