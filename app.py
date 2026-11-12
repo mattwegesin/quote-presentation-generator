@@ -206,6 +206,11 @@ def generate():
         generate_gsa = request.form.get("generate_gsa", "false").lower() == "true"
         gsa_notes = request.form.get("gsa_notes", "").strip()
 
+        # Check if Cabling Proposal is requested
+        generate_cabling = request.form.get("generate_cabling", "false").lower() == "true"
+        cabling_monday_item_id = request.form.get("cabling_monday_item_id", "").strip()
+        cabling_internal_quote_id = request.form.get("cabling_internal_quote_id", "").strip()
+
         # Load PPTX into stream
         pptx_stream = io.BytesIO()
         if base_pptx_choice == "custom":
@@ -308,6 +313,51 @@ def generate():
         ]
         pdf_stream_bs.seek(0)
         
+        # ---------------------------------------------------------
+        # GENERATE CABLING PROPOSAL IF REQUESTED
+        # ---------------------------------------------------------
+        cabling_client_stream = None
+        cabling_bs_stream = None
+        cabling_target_page = None
+        if generate_cabling and cabling_internal_quote_id:
+            logger.info(f"Cabling Proposal requested for {property_code}. Downloading quote {cabling_internal_quote_id}.")
+            cabling_excel_path = download_ihg_quote_xlsx(cabling_internal_quote_id, output_dir="/tmp")
+            if cabling_excel_path:
+                with open(cabling_excel_path, 'rb') as f:
+                    cabling_excel_stream = io.BytesIO(f.read())
+                
+                cabling_pptx_path = os.path.join(os.path.dirname(__file__), "Cabling_Proposal_Template.pptx")
+                if os.path.exists(cabling_pptx_path):
+                    with open(cabling_pptx_path, "rb") as f:
+                        cabling_pptx_stream = io.BytesIO(f.read())
+                    
+                    cabling_custom_notes = None
+                    cabling_fetched_notes = get_quote_notes(cabling_internal_quote_id)
+                    if cabling_fetched_notes:
+                        cabling_custom_notes = [note.strip() for note in cabling_fetched_notes.split('\n') if note.strip()]
+
+                    # Generate for BoldSign
+                    cabling_output_bs, cabling_target_page, _ = generate_presentation(
+                        cabling_pptx_stream, cabling_excel_stream, property_code=property_code, 
+                        for_boldsign=True, signer_name=signer_name, custom_notes=cabling_custom_notes
+                    )
+                    cabling_output_bs.seek(0)
+                    cabling_bs_stream = convert_pptx_to_pdf(cabling_output_bs)
+
+                    # Generate for Client
+                    cabling_pptx_stream.seek(0)
+                    cabling_excel_stream.seek(0)
+                    cabling_output_client, _, _ = generate_presentation(
+                        cabling_pptx_stream, cabling_excel_stream, property_code=property_code, 
+                        for_boldsign=False, signer_name=signer_name, custom_notes=cabling_custom_notes
+                    )
+                    cabling_output_client.seek(0)
+                    cabling_client_stream = convert_pptx_to_pdf(cabling_output_client)
+                else:
+                    logger.error("Cabling_Proposal_Template.pptx not found on server.")
+            else:
+                logger.error(f"Failed to download Cabling Quote {cabling_internal_quote_id}.")
+
         # ---------------------------------------------------------
         # GENERATE GSA LOCALLY IF REQUESTED
         # ---------------------------------------------------------
@@ -534,11 +584,11 @@ def generate():
                 'Signers[1][signerType]': 'Signer',
                 'Signers[1][signerOrder]': '2'
             }
-            
+
             gsa_files = [
                 ('Files', ('Guest_Service_Agreement.pdf', gsa_bs_stream.read(), 'application/pdf'))
             ]
-            
+
             resp_gsa = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=gsa_data, files=gsa_files)
             if resp_gsa.status_code not in (200, 201):
                 logger.error(f"BoldSign GSA API Error: {resp_gsa.status_code} - {resp_gsa.text}")
@@ -546,18 +596,71 @@ def generate():
             else:
                 logger.info(f"Successfully created BoldSign GSA document: {resp_gsa.json().get('documentId')}")
 
+        # ---------------------------------------------------------
+        # SEND CABLING PROPOSAL TO BOLDSIGN (IF REQUESTED)
+        # ---------------------------------------------------------
+        if generate_cabling and cabling_bs_stream:
+            cabling_title_str = f"Cabling Proposal - {property_code}"
+            if cabling_monday_item_id:
+                cabling_title_str += f" | ID:{cabling_monday_item_id}"
+            if cabling_internal_quote_id:
+                cabling_title_str += f" | QID:{cabling_internal_quote_id}"
+
+            cabling_data = {
+                'Title': cabling_title_str,
+                'ExpiryDays': '14',
+                'Signers[0][name]': signer_name,
+                'Signers[0][emailAddress]': signer_email,
+                'Signers[0][signerType]': 'Signer',
+                'Signers[0][recipientNotificationSettings][signatureRequest]': 'false'
+            }
+
+            if cabling_target_page:
+                cabling_data.update({
+                    f'Signers[0][formFields][0][id]': 'cabling_signature',
+                    f'Signers[0][formFields][0][fieldType]': 'Signature',
+                    f'Signers[0][formFields][0][pageNumber]': str(cabling_target_page),
+                    f'Signers[0][formFields][0][bounds][x]': '344',
+                    f'Signers[0][formFields][0][bounds][y]': '584',
+                    f'Signers[0][formFields][0][bounds][width]': '214',
+                    f'Signers[0][formFields][0][bounds][height]': '30',
+                    f'Signers[0][formFields][0][isRequired]': 'true'
+                })
+
+            cabling_files = [
+                ('Files', ('Cabling_Proposal.pdf', cabling_bs_stream.read(), 'application/pdf'))
+            ]
+
+            resp_cabling = requests.post("https://api.boldsign.com/v1/document/send", headers=headers, data=cabling_data, files=cabling_files)
+            if resp_cabling.status_code not in (200, 201):
+                logger.error(f"BoldSign Cabling API Error: {resp_cabling.status_code} - {resp_cabling.text}")
+                raise RuntimeError(f"Failed to create BoldSign Cabling document: {resp_cabling.text}")
+            else:
+                logger.info(f"Successfully created BoldSign Cabling document: {resp_cabling.json().get('documentId')}")
+
+
         logger.info(f"Successfully compiled documents. Preparing download stream.")
         pdf_stream_client.seek(0)
 
-        if generate_gsa and gsa_client_stream:
+        if generate_gsa or generate_cabling:
             import zipfile
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr(generated_filename, pdf_stream_client.read())
-                zf.writestr(f"GSA_{property_code}.pdf", gsa_client_stream.read())
-            
+
+                if generate_gsa and gsa_client_stream:
+                    zf.writestr(f"GSA_{property_code}.pdf", gsa_client_stream.read())
+
+                if generate_cabling and cabling_client_stream:
+                    zf.writestr(f"Cabling_Proposal_{property_code}.pdf", cabling_client_stream.read())
+
             zip_buffer.seek(0)
-            zip_filename = f"Proposal_and_GSA_{property_code}.zip"
+
+            zip_name_parts = ["Proposal"]
+            if generate_gsa: zip_name_parts.append("GSA")
+            if generate_cabling: zip_name_parts.append("Cabling")
+
+            zip_filename = f"{'_'.join(zip_name_parts)}_{property_code}.zip"
             return send_file(
                 zip_buffer,
                 mimetype="application/zip",

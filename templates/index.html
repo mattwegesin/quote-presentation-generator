@@ -667,6 +667,9 @@
         <input type="hidden" id="gsa_term" name="gsa_term" value="">
         <input type="hidden" id="gsa_studio" name="gsa_studio" value="">
         <input type="hidden" id="gsa_meeting" name="gsa_meeting" value="">
+        <input type="hidden" id="generate_cabling" name="generate_cabling" value="false">
+        <input type="hidden" id="cabling_monday_item_id" name="cabling_monday_item_id" value="">
+        <input type="hidden" id="cabling_internal_quote_id" name="cabling_internal_quote_id" value="">
         
         <div class="input-list" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
           <div class="input-group">
@@ -780,7 +783,14 @@
             </svg>
             <span id="btnGsaText">Add GSA Contract</span>
           </button>
-          
+
+          <button type="button" class="btn-secondary" id="btnAddCabling" style="padding: 1rem 1.5rem; font-size: 1rem; flex: 1; max-width: 250px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; vertical-align: middle;">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span id="btnCablingText">Add Cabling Proposal</span>
+          </button>
+
           <button type="button" class="btn-submit" id="btnSubmit" style="flex: 2;">
             <span class="spinner" id="spinner"></span>
             <svg id="download-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -902,6 +912,46 @@
       <div class="modal-footer" id="modalButtons2">
         <button class="btn-secondary" id="btnGsaCancel">Cancel / Remove GSA</button>
         <button class="btn-primary" id="btnGsaConfirm">Save GSA Details</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="cablingModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-icon" style="background-color: #0072CE; color: white;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        <h3 class="modal-title">Configure Cabling Proposal</h3>
+      </div>
+      <div class="modal-body">
+        <p>Select the specific Monday.com project and Internal Quote ID for the Cabling Proposal.</p>
+
+        <div class="modal-notes" style="display: block; margin-top: 1.5rem;">
+          <div style="margin-bottom: 1rem; text-align: center;">
+            <button type="button" id="btnLookupCabling" style="background-color: var(--secondary-slate); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%;">Lookup Cabling Projects</button>
+          </div>
+
+          <div class="input-group" id="modal_cabling_monday_group" style="display: none; margin-bottom: 1rem;">
+            <label for="modal_cabling_monday_item_id" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Select Cabling Monday Project</label>
+            <select id="modal_cabling_monday_item_id" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem; background-color: #FAFAFC;">
+              <option value="">-- Select Project --</option>
+            </select>
+          </div>
+
+          <div class="input-group" id="modal_cabling_quote_group" style="display: none; margin-bottom: 1rem;">
+            <label for="modal_cabling_internal_quote_id" class="dropzone-label" style="margin-bottom: 0.5rem; display: block;">Select Cabling IHG Quote (Auto-Download)</label>
+            <select id="modal_cabling_internal_quote_id" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-family: var(--font-inter); font-size: 0.9rem; background-color: #FAFAFC;">
+              <option value="">-- Select Quote --</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnCablingCancel">Cancel / Remove Cabling</button>
+        <button class="btn-primary" id="btnCablingConfirm">Save Cabling Details</button>
       </div>
     </div>
   </div>
@@ -1204,6 +1254,158 @@
       btnAddGsa.style.backgroundColor = "#E0F2FE";
       btnAddGsa.style.borderColor = "#0072CE";
       btnAddGsa.style.color = "#0072CE";
+    });
+
+    const btnAddCabling = document.getElementById('btnAddCabling');
+    const btnCablingText = document.getElementById('btnCablingText');
+    const cablingModal = document.getElementById('cablingModal');
+    const btnLookupCabling = document.getElementById('btnLookupCabling');
+    const modalCablingMondayGroup = document.getElementById('modal_cabling_monday_group');
+    const modalCablingQuoteGroup = document.getElementById('modal_cabling_quote_group');
+    const modalCablingMondaySelect = document.getElementById('modal_cabling_monday_item_id');
+    const modalCablingQuoteSelect = document.getElementById('modal_cabling_internal_quote_id');
+    const btnCablingCancel = document.getElementById('btnCablingCancel');
+    const btnCablingConfirm = document.getElementById('btnCablingConfirm');
+    const generateCablingInput = document.getElementById('generate_cabling');
+    const formCablingMondayId = document.getElementById('cabling_monday_item_id');
+    const formCablingQuoteId = document.getElementById('cabling_internal_quote_id');
+
+    btnAddCabling.addEventListener('click', () => {
+      cablingModal.classList.add('active');
+    });
+
+    btnCablingCancel.addEventListener('click', (e) => {
+      e.preventDefault();
+      cablingModal.classList.remove('active');
+      generateCablingInput.value = 'false';
+      formCablingMondayId.value = '';
+      formCablingQuoteId.value = '';
+      
+      modalCablingMondaySelect.innerHTML = '<option value="">-- Select Project --</option>';
+      modalCablingQuoteSelect.innerHTML = '<option value="">-- Select Quote --</option>';
+      modalCablingMondayGroup.style.display = 'none';
+      modalCablingQuoteGroup.style.display = 'none';
+
+      btnCablingText.textContent = "Add Cabling Proposal";
+      btnAddCabling.style.backgroundColor = "";
+      btnAddCabling.style.color = "";
+      btnAddCabling.style.borderColor = "";
+    });
+
+    btnLookupCabling.addEventListener('click', async () => {
+      const propertyCode = document.getElementById('property_code').value.trim();
+      if (!propertyCode) {
+        alert("Please enter a Property / INN Code on the main form first.");
+        return;
+      }
+
+      btnLookupCabling.textContent = "Loading...";
+      btnLookupCabling.disabled = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('property_code', propertyCode);
+
+        const response = await fetch('/api/get_monday_quotes', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to lookup quotes");
+        }
+
+        const items = await response.json();
+        
+        modalCablingMondaySelect.innerHTML = '<option value="">-- Select Project --</option>';
+        if (items.length === 0) {
+          alert("No matching projects found in Monday.com for this Property Code.");
+          modalCablingMondayGroup.style.display = 'none';
+        } else {
+          items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = item.name;
+            modalCablingMondaySelect.appendChild(option);
+          });
+          modalCablingMondayGroup.style.display = 'block';
+        }
+      } catch (err) {
+        alert(err.message);
+        modalCablingMondayGroup.style.display = 'none';
+      } finally {
+        btnLookupCabling.textContent = "Lookup Cabling Projects";
+        btnLookupCabling.disabled = false;
+      }
+    });
+
+    modalCablingMondaySelect.addEventListener('change', async () => {
+      const propCode = document.getElementById('property_code').value.trim();
+      if (!propCode || !modalCablingMondaySelect.value) {
+        modalCablingQuoteGroup.style.display = 'none';
+        return;
+      }
+
+      modalCablingQuoteGroup.style.display = 'block';
+      modalCablingQuoteSelect.innerHTML = '<option value="">Loading quotes...</option>';
+
+      try {
+        const formData = new FormData();
+        formData.append('property_code', propCode);
+        const resp = await fetch('/api/internal_quotes', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!resp.ok) throw new Error('Failed to fetch quotes');
+        const quotes = await resp.json();
+
+        modalCablingQuoteSelect.innerHTML = '<option value="">-- Select Quote (Optional) --</option>';
+        if (quotes.length === 0) {
+          modalCablingQuoteSelect.innerHTML = '<option value="">-- No Quotes Found for ' + propCode + ' --</option>';
+        } else {
+          quotes.forEach(q => {
+             let qId = "";
+             if (q.links && q.links.length > 0) {
+                 const match = q.links.find(l => l.includes('customerView.php?id='));
+                 if (match) qId = match.split('id=')[1].split('&')[0];
+             }
+             if (qId) {
+                 const opt = document.createElement('option');
+                 opt.value = qId;
+                 const quoteType = (q.info && q.info["Quote Type"]) ? q.info["Quote Type"] : "Quote";
+                 const grandTotal = (q.info && q.info["Grand Total"]) ? q.info["Grand Total"] : "$0.00";
+                 opt.textContent = `[${q.status}] ${quoteType} (${grandTotal})`;
+                 modalCablingQuoteSelect.appendChild(opt);
+             }
+          });
+        }
+      } catch (err) {
+        console.error("Internal quote fetch failed", err);
+        modalCablingQuoteSelect.innerHTML = '<option value="">Error loading quotes</option>';
+      }
+    });
+
+    btnCablingConfirm.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      const selectedMonday = modalCablingMondaySelect.value;
+      if (!selectedMonday) {
+        alert("Please select a Monday.com project.");
+        return;
+      }
+
+      generateCablingInput.value = 'true';
+      formCablingMondayId.value = selectedMonday;
+      formCablingQuoteId.value = modalCablingQuoteSelect.value;
+
+      cablingModal.classList.remove('active');
+
+      btnCablingText.textContent = "Edit Cabling Proposal";
+      btnAddCabling.style.backgroundColor = "#E0F2FE";
+      btnAddCabling.style.borderColor = "#0072CE";
+      btnAddCabling.style.color = "#0072CE";
     });
 
     btnSubmit.addEventListener('click', async (e) => {
