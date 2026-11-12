@@ -1376,9 +1376,7 @@
              if (qId) {
                  const opt = document.createElement('option');
                  opt.value = qId;
-                 const quoteType = (q.info && q.info["Quote Type"]) ? q.info["Quote Type"] : "Quote";
-                 const grandTotal = (q.info && q.info["Grand Total"]) ? q.info["Grand Total"] : "$0.00";
-                 opt.textContent = `[${q.status}] ${quoteType} (${grandTotal})`;
+                 opt.textContent = `${q.job} | ${q.package} | ${q.status} | $${q.grand_total}`;
                  modalCablingQuoteSelect.appendChild(opt);
              }
           });
