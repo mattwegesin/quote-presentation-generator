@@ -85,10 +85,14 @@ def convert_pptx_to_pdf(pptx_stream):
         logger.info("Running LibreOffice headless conversion to PDF...")
         # Note: In a Docker container running LibreOffice, this command converts the file
         cmd = [
-            "libreoffice", "--headless", "--convert-to", "pdf",
-            "--outdir", temp_dir, input_path
+            "libreoffice", 
+            f"-env:UserInstallation=file://{temp_dir}/profile",
+            "--headless", 
+            "--convert-to", "pdf",
+            "--outdir", temp_dir, 
+            input_path
         ]
-        
+
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
@@ -243,12 +247,15 @@ def generate():
             if fetched_notes:
                 custom_notes = [note.strip() for note in fetched_notes.split('\n') if note.strip()]
 
+        import concurrent.futures
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+        
         # ---------------------------------------------------------
         # GENERATE FOR BOLDSIGN (No CTA Button, Has Signature Lines)
         # ---------------------------------------------------------
         output_stream_bs, target_page, grand_total = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=True, signer_name=signer_name, custom_notes=custom_notes)
         output_stream_bs.seek(0)
-        pdf_stream_bs = convert_pptx_to_pdf(output_stream_bs)
+        future_main_bs = executor.submit(convert_pptx_to_pdf, output_stream_bs)
 
         # ---------------------------------------------------------
         # GENERATE FOR CLIENT (Has CTA Button, No Signature Lines)
@@ -257,7 +264,7 @@ def generate():
         excel_stream.seek(0)
         output_stream_client, _, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name, custom_notes=custom_notes)
         output_stream_client.seek(0)
-        pdf_stream_client = convert_pptx_to_pdf(output_stream_client)
+        future_main_client = executor.submit(convert_pptx_to_pdf, output_stream_client)
 
         if monday_item_id and quote_num != "UNKNOWN":
             logger.info(f"Updating Monday.com item {monday_item_id} with quote number and total.")
@@ -293,6 +300,20 @@ def generate():
                         logger.error(f"Error updating Monday quote columns: {resp_mon.json()['errors']}")
                 except Exception as e:
                     logger.error(f"Failed to update Monday quote columns: {e}")
+
+        logger.info("Waiting for all PDF conversions to complete...")
+        pdf_stream_bs = future_main_bs.result()
+        pdf_stream_client = future_main_client.result()
+        
+        if generate_cabling and cabling_internal_quote_id and 'future_cabling_bs' in locals():
+            cabling_bs_stream = future_cabling_bs.result()
+            cabling_client_stream = future_cabling_client.result()
+            
+        if generate_gsa and 'future_gsa_bs' in locals():
+            gsa_bs_stream, total_monthly = future_gsa_bs.result()
+            gsa_client_stream, _ = future_gsa_client.result()
+            
+        executor.shutdown()
 
         # Send to BoldSign
         boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
@@ -342,7 +363,7 @@ def generate():
                         for_boldsign=True, signer_name=signer_name, custom_notes=cabling_custom_notes
                     )
                     cabling_output_bs.seek(0)
-                    cabling_bs_stream = convert_pptx_to_pdf(cabling_output_bs)
+                    future_cabling_bs = executor.submit(convert_pptx_to_pdf, cabling_output_bs)
 
                     # Generate for Client
                     cabling_pptx_stream.seek(0)
@@ -352,7 +373,7 @@ def generate():
                         for_boldsign=False, signer_name=signer_name, custom_notes=cabling_custom_notes
                     )
                     cabling_output_client.seek(0)
-                    cabling_client_stream = convert_pptx_to_pdf(cabling_output_client)
+                    future_cabling_client = executor.submit(convert_pptx_to_pdf, cabling_output_client)
                 else:
                     logger.error("Cabling_Proposal_Template.pptx not found on server.")
             else:
@@ -432,35 +453,15 @@ def generate():
             template_path = os.path.join(os.path.dirname(__file__), "GSA_TAGS.docx")
             
             # Generate GSA for BoldSign (No CTA Button)
-            gsa_bs_stream, total_monthly = generate_gsa_docx_to_pdf(
-                template_path=template_path,
-                property_code=property_code,
-                signer_name=signer_name,
-                signer_email=signer_email,
-                hotel_name=hotel_name,
-                address=address,
-                room_count=room_count,
-                term=gsa_term,
-                studio=gsa_studio,
-                meeting_fee=gsa_meeting,
-                notes=gsa_notes,
-                for_boldsign=True
+            future_gsa_bs = executor.submit(
+                generate_gsa_docx_to_pdf,
+                template_path, property_code, signer_name, signer_email, hotel_name, address, room_count, gsa_term, gsa_studio, gsa_meeting, gsa_notes, True
             )
 
             # Generate GSA for Client (Has CTA Button)
-            gsa_client_stream, _ = generate_gsa_docx_to_pdf(
-                template_path=template_path,
-                property_code=property_code,
-                signer_name=signer_name,
-                signer_email=signer_email,
-                hotel_name=hotel_name,
-                address=address,
-                room_count=room_count,
-                term=gsa_term,
-                studio=gsa_studio,
-                meeting_fee=gsa_meeting,
-                notes=gsa_notes,
-                for_boldsign=False
+            future_gsa_client = executor.submit(
+                generate_gsa_docx_to_pdf,
+                template_path, property_code, signer_name, signer_email, hotel_name, address, room_count, gsa_term, gsa_studio, gsa_meeting, gsa_notes, False
             )
 
             # Check for existing GSA quote and create if missing

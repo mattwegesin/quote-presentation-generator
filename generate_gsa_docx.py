@@ -69,8 +69,12 @@ def generate_gsa_docx_to_pdf(template_path, property_code, signer_name, signer_e
                 libreoffice_exec = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
                 
         cmd = [
-            libreoffice_exec, "--headless", "--convert-to", "pdf",
-            "--outdir", temp_dir, temp_docx
+            libreoffice_exec, 
+            f"-env:UserInstallation=file://{temp_dir}/profile",
+            "--headless", 
+            "--convert-to", "pdf",
+            "--outdir", temp_dir, 
+            temp_docx
         ]
         
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
