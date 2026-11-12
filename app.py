@@ -803,6 +803,83 @@ def get_internal_quotes():
         logger.error(f"Failed to fetch internal quotes: {e}")
         return jsonify({"error": "Failed to fetch quotes from internal system"}), 500
 
+@app.route("/api/boldsign/status/<inn_code>", methods=["GET"])
+@requires_auth
+def get_boldsign_status(inn_code):
+    boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+    if not boldsign_api_key:
+        return jsonify({"error": "BoldSign integration not configured."}), 500
+
+    headers = {
+        'X-API-KEY': boldsign_api_key,
+        'Accept': 'application/json'
+    }
+    
+    search_url = f"https://api.boldsign.com/v1/document/list?searchQuery={inn_code}&pageSize=10"
+    try:
+        resp = requests.get(search_url, headers=headers)
+        if resp.status_code != 200:
+            return jsonify({"error": "Failed to search BoldSign documents."}), 500
+        
+        data = resp.json()
+        docs = data.get("result", [])
+        
+        # Format the response
+        results = []
+        for doc in docs:
+            # Check signers if in progress to give better details
+            signer_statuses = []
+            if doc.get("status") == "InProgress":
+                try:
+                    prop_resp = requests.get(f"https://api.boldsign.com/v1/document/properties?documentId={doc['documentId']}", headers=headers)
+                    if prop_resp.status_code == 200:
+                        prop_data = prop_resp.json()
+                        for s in prop_data.get("signerDetails", []):
+                            signer_statuses.append(f"{s.get('signerName')} ({s.get('status', 'Pending')})")
+                except Exception as e:
+                    logger.error(f"Failed to fetch document properties for {doc['documentId']}: {e}")
+            
+            results.append({
+                "documentId": doc.get("documentId"),
+                "title": doc.get("messageTitle"),
+                "status": doc.get("status"),
+                "createdDate": doc.get("createdDate"),
+                "signers": ", ".join(signer_statuses) if signer_statuses else ""
+            })
+            
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"Error querying BoldSign status for {inn_code}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route("/api/boldsign/revoke/<doc_id>", methods=["POST"])
+@requires_auth
+def revoke_boldsign_document(doc_id):
+    boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+    if not boldsign_api_key:
+        return jsonify({"error": "BoldSign integration not configured."}), 500
+
+    headers = {
+        'X-API-KEY': boldsign_api_key,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+    
+    payload = request.get_json() or {}
+    message = payload.get("message", "Document revoked by admin.")
+    
+    revoke_url = f"https://api.boldsign.com/v1/document/revoke?documentId={doc_id}"
+    try:
+        resp = requests.post(revoke_url, headers=headers, json={"message": message})
+        if resp.status_code in (200, 204):
+            return jsonify({"success": True, "message": "Document successfully revoked."})
+        else:
+            logger.error(f"Failed to revoke BoldSign document {doc_id}: {resp.status_code} - {resp.text}")
+            return jsonify({"error": f"Failed to revoke document: {resp.text}"}), 500
+    except Exception as e:
+        logger.error(f"Error revoking BoldSign document {doc_id}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
 # Track processed document IDs to prevent duplicate webhook processing
 processed_doc_ids = set()
 

@@ -365,6 +365,9 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             p.space_after = Pt(8)
         return p
 
+    if custom_notes is None:
+        custom_notes = []
+
     # Determine if notes need a dedicated slide
     notes_text = "\n".join(custom_notes)
     needs_dedicated_slide = len(notes_text) > 400 or len(custom_notes) > 4
