@@ -1360,21 +1360,23 @@
         }
 
         const items = await response.json();
-        
+
         modalCablingMondaySelect.innerHTML = '<option value="">-- Select Project --</option>';
-        if (items.length === 0) {
-          alert("No matching projects found in Monday.com for this Property Code.");
-          modalCablingMondayGroup.style.display = 'none';
-        } else {
-          items.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.id;
-            option.textContent = item.name;
-            modalCablingMondaySelect.appendChild(option);
-          });
-          modalCablingMondayGroup.style.display = 'block';
-        }
-      } catch (err) {
+        items.forEach(item => {
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = item.name;
+          modalCablingMondaySelect.appendChild(option);
+        });
+
+        const createOption = document.createElement('option');
+        createOption.value = "CREATE_NEW";
+        createOption.textContent = "-- CREATE NEW CABLING PROJECT --";
+        createOption.style.fontWeight = "bold";
+        modalCablingMondaySelect.appendChild(createOption);
+
+        modalCablingMondayGroup.style.display = 'block';
+        } catch (err) {
         alert(err.message);
         modalCablingMondayGroup.style.display = 'none';
       } finally {

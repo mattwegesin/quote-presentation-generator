@@ -348,7 +348,32 @@ def generate():
                         cabling_quote_match = re.search(r'quote-(\d+)', cabling_excel_filename, re.IGNORECASE)
                         cabling_quote_num = cabling_quote_match.group(1) if cabling_quote_match else "UNKNOWN"
                         
-                        if cabling_quote_num != "UNKNOWN":
+                        if cabling_monday_item_id == "CREATE_NEW" and monday_item_id:
+                            logger.info(f"Creating new Cabling project from {monday_item_id}")
+                            monday_token = os.environ.get("MONDAY_API_TOKEN")
+                            if monday_token:
+                                monday_headers = {
+                                    "Authorization": monday_token,
+                                    "API-Version": "2024-01",
+                                    "Content-Type": "application/json"
+                                }
+                                dup_query = '''
+                                mutation ($itemId: ID!) {
+                                  duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
+                                    id
+                                  }
+                                }
+                                '''
+                                dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
+                                dup_data = dup_resp.json()
+                                if "errors" not in dup_data:
+                                    cabling_monday_item_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
+                                    logger.info(f"Successfully duplicated item to new Cabling item {cabling_monday_item_id}")
+                                    
+                                    from monday_helper import process_monday_cabling_duplicate_async
+                                    import threading
+                                    threading.Thread(target=process_monday_cabling_duplicate_async, args=(cabling_monday_item_id, property_code, monday_token, cabling_quote_num, cabling_grand_total)).start()
+                        elif cabling_quote_num != "UNKNOWN":
                             logger.info(f"Updating Cabling Monday.com item {cabling_monday_item_id} with quote number and total.")
                             if monday_token:
                                 cabling_col_vals = {
