@@ -365,6 +365,15 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             p.space_after = Pt(8)
         return p
 
+    # --- SLIDE 0 (Optional): Custom Notes ---
+    if custom_notes:
+        slide0 = setup_slide("Acceptance: Notes")
+        tb_notes = slide0.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(11.8), Inches(4.6))
+        tf_notes = tb_notes.text_frame
+        tf_notes.word_wrap = True
+        for note in custom_notes:
+            add_p(tf_notes, note)
+
     # --- SLIDE 1: Disclaimer & Caveats ---
     slide1 = setup_slide("Acceptance: Terms & Caveats")
     
@@ -377,11 +386,6 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
     tb_left = slide1.shapes.add_textbox(Inches(0.7), Inches(1.0), Inches(5.4), Inches(4.6))
     tf_left = tb_left.text_frame
     tf_left.word_wrap = True
-
-    if custom_notes:
-        add_p(tf_left, "Notes", bold=True, center=True)
-        for note in custom_notes:
-            add_p(tf_left, note)
 
     add_p(tf_left, "Supply Chain & Pricing Disclaimer", bold=True, center=True)
     for term in legal_terms.get("supply_chain", []):
