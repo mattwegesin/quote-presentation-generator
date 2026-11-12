@@ -773,25 +773,27 @@
           </div>
         </div>
 
-        <div class="form-actions" style="display: flex; gap: 1rem; align-items: center;">
-          <button type="button" class="btn-secondary" id="btnAddGsa" style="padding: 1rem 1.5rem; font-size: 1rem; flex: 1; max-width: 250px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; vertical-align: middle;">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="18" x2="12" y2="12"></line>
-              <line x1="9" y1="15" x2="15" y2="15"></line>
-            </svg>
-            <span id="btnGsaText">Add GSA Contract</span>
-          </button>
+        <div class="form-actions">
+          <div style="display: flex; gap: 1rem; justify-content: center; width: 100%;">
+            <button type="button" class="btn-secondary" id="btnAddGsa" style="padding: 1rem 1.5rem; font-size: 1rem; flex: 1; max-width: 250px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; vertical-align: middle;">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+              </svg>
+              <span id="btnGsaText">Add GSA Contract</span>
+            </button>
 
-          <button type="button" class="btn-secondary" id="btnAddCabling" style="padding: 1rem 1.5rem; font-size: 1rem; flex: 1; max-width: 250px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; vertical-align: middle;">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-            <span id="btnCablingText">Add Cabling Proposal</span>
-          </button>
+            <button type="button" class="btn-secondary" id="btnAddCabling" style="padding: 1rem 1.5rem; font-size: 1rem; flex: 1; max-width: 250px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; vertical-align: middle;">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span id="btnCablingText">Add Cabling Proposal</span>
+            </button>
+          </div>
 
-          <button type="button" class="btn-submit" id="btnSubmit" style="flex: 2;">
+          <button type="button" class="btn-submit" id="btnSubmit">
             <span class="spinner" id="spinner"></span>
             <svg id="download-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
