@@ -336,12 +336,38 @@ def generate():
                     # Generate for Client
                     cabling_pptx_stream.seek(0)
                     cabling_excel_stream.seek(0)
-                    cabling_output_client, _, _ = generate_presentation(
+                    cabling_output_client, _, cabling_grand_total = generate_presentation(
                         cabling_pptx_stream, cabling_excel_stream, property_code=property_code, 
                         for_boldsign=False, signer_name=signer_name, custom_notes=cabling_custom_notes
                     )
                     cabling_output_client.seek(0)
                     future_cabling_client = executor.submit(convert_pptx_to_pdf, cabling_output_client)
+                    
+                    if cabling_monday_item_id:
+                        cabling_excel_filename = os.path.basename(cabling_excel_path)
+                        cabling_quote_match = re.search(r'quote-(\d+)', cabling_excel_filename, re.IGNORECASE)
+                        cabling_quote_num = cabling_quote_match.group(1) if cabling_quote_match else "UNKNOWN"
+                        
+                        if cabling_quote_num != "UNKNOWN":
+                            logger.info(f"Updating Cabling Monday.com item {cabling_monday_item_id} with quote number and total.")
+                            if monday_token:
+                                cabling_col_vals = {
+                                    "text_mm8v74nz": cabling_quote_num,
+                                    "numeric_mm8vcbpj": cabling_grand_total
+                                }
+                                try:
+                                    resp_mon_cab = requests.post("https://api.monday.com/v2", headers=headers_mon, json={
+                                        "query": mutation,
+                                        "variables": {
+                                            "itemId": cabling_monday_item_id,
+                                            "boardId": "18424851511",
+                                            "colValues": json.dumps(cabling_col_vals)
+                                        }
+                                    })
+                                    if "errors" in resp_mon_cab.json():
+                                        logger.error(f"Error updating Cabling Monday quote columns: {resp_mon_cab.json()['errors']}")
+                                except Exception as e:
+                                    logger.error(f"Failed to update Cabling Monday quote columns: {e}")
                 else:
                     logger.error("Cabling_Proposal_Template.pptx not found on server.")
             else:
