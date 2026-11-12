@@ -800,7 +800,7 @@
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span id="btnText">Generate Presentation</span>
+            <span id="btnText">Generate Proposal</span>
           </button>
           <div class="progress-bar-container" id="progressBar" style="width: 100%;">
             <div class="progress-bar-fill"></div>
@@ -1210,7 +1210,18 @@
       gsaModal.classList.add('active');
     });
 
-    function resetModal() {
+    function updateSubmitButtonText() {
+      const gsaActive = document.getElementById('generate_gsa').value === 'true';
+      const cablingActive = document.getElementById('generate_cabling').value === 'true';
+
+      let text = "Generate Proposal";
+      if (gsaActive) text += " + GSA Contract";
+      if (cablingActive) text += " + Cabling Proposal";
+
+      document.getElementById('btnText').textContent = text;
+    }
+
+    function resetModals() {
       gsaModal.classList.remove('active');
       gsaNotesInput.value = '';
       gsaTermInput.value = '';
@@ -1221,16 +1232,43 @@
       formGsaTermInput.value = '';
       formGsaStudioInput.value = '';
       formGsaMeetingInput.value = '';
-      
+
       btnGsaText.textContent = "Add GSA Contract";
       btnAddGsa.style.backgroundColor = "";
       btnAddGsa.style.color = "";
       btnAddGsa.style.borderColor = "";
+
+      // Reset Cabling
+      const generateCablingInput = document.getElementById('generate_cabling');
+      const formCablingMondayId = document.getElementById('cabling_monday_item_id');
+      const formCablingQuoteId = document.getElementById('cabling_internal_quote_id');
+      const modalCablingMondaySelect = document.getElementById('modal_cabling_monday_item_id');
+      const modalCablingQuoteSelect = document.getElementById('modal_cabling_internal_quote_id');
+      const modalCablingMondayGroup = document.getElementById('modal_cabling_monday_group');
+      const modalCablingQuoteGroup = document.getElementById('modal_cabling_quote_group');
+      const btnCablingText = document.getElementById('btnCablingText');
+      const btnAddCabling = document.getElementById('btnAddCabling');
+
+      generateCablingInput.value = 'false';
+      formCablingMondayId.value = '';
+      formCablingQuoteId.value = '';
+
+      modalCablingMondaySelect.innerHTML = '<option value="">-- Select Project --</option>';
+      modalCablingQuoteSelect.innerHTML = '<option value="">-- Select Quote --</option>';
+      modalCablingMondayGroup.style.display = 'none';
+      modalCablingQuoteGroup.style.display = 'none';
+
+      btnCablingText.textContent = "Add Cabling Proposal";
+      btnAddCabling.style.backgroundColor = "";
+      btnAddCabling.style.color = "";
+      btnAddCabling.style.borderColor = "";
+
+      updateSubmitButtonText();
     }
 
     btnGsaCancel.addEventListener('click', (e) => {
       e.preventDefault();
-      resetModal();
+      resetModals();
     });
 
     btnGsaConfirm.addEventListener('click', (e) => {
@@ -1256,6 +1294,7 @@
       btnAddGsa.style.backgroundColor = "#E0F2FE";
       btnAddGsa.style.borderColor = "#0072CE";
       btnAddGsa.style.color = "#0072CE";
+      updateSubmitButtonText();
     });
 
     const btnAddCabling = document.getElementById('btnAddCabling');
@@ -1292,6 +1331,8 @@
       btnAddCabling.style.backgroundColor = "";
       btnAddCabling.style.color = "";
       btnAddCabling.style.borderColor = "";
+      
+      updateSubmitButtonText();
     });
 
     btnLookupCabling.addEventListener('click', async () => {
@@ -1406,6 +1447,7 @@
       btnAddCabling.style.backgroundColor = "#E0F2FE";
       btnAddCabling.style.borderColor = "#0072CE";
       btnAddCabling.style.color = "#0072CE";
+      updateSubmitButtonText();
     });
 
     btnSubmit.addEventListener('click', async (e) => {
@@ -1513,8 +1555,7 @@
 
         btnText.textContent = "Generation Complete!";
         setTimeout(() => {
-          btnText.textContent = "Generate Presentation";
-          resetModal();
+          resetModals();
         }, 3000);
       } catch (err) {
         showError(err.message);
