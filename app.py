@@ -301,25 +301,6 @@ def generate():
                 except Exception as e:
                     logger.error(f"Failed to update Monday quote columns: {e}")
 
-        # Send to BoldSign
-        boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
-        if not boldsign_api_key:
-            raise ValueError("BOLDSIGN_API_KEY is missing from Render Environment Variables. Please add it to generate the document.")
-
-        logger.info(f"Sending document to BoldSign for {property_code}")
-        pdf_stream_bs.seek(0)
-
-        headers = {
-            'X-API-KEY': boldsign_api_key,
-            'Accept': 'application/json'
-        }
-
-        # Initialize the file list with the Proposal
-        proposal_files = [
-            ('Files', ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf'))
-        ]
-        pdf_stream_bs.seek(0)
-        
         # ---------------------------------------------------------
         # GENERATE CABLING PROPOSAL IF REQUESTED
         # ---------------------------------------------------------
@@ -523,6 +504,24 @@ def generate():
         # ---------------------------------------------------------
         # SEND PROPOSAL TO BOLDSIGN
         # ---------------------------------------------------------
+        boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+        if not boldsign_api_key:
+            raise ValueError("BOLDSIGN_API_KEY is missing from Render Environment Variables. Please add it to generate the document.")
+
+        logger.info(f"Sending document to BoldSign for {property_code}")
+        pdf_stream_bs.seek(0)
+
+        headers = {
+            'X-API-KEY': boldsign_api_key,
+            'Accept': 'application/json'
+        }
+
+        # Initialize the file list with the Proposal
+        proposal_files = [
+            ('Files', ('Generated_Proposal.pdf', pdf_stream_bs.read(), 'application/pdf'))
+        ]
+        pdf_stream_bs.seek(0)
+
         title_str = f"Hospitality Technologies Agreement - {property_code}"
         if monday_item_id:
             title_str += f" | ID:{monday_item_id}"
