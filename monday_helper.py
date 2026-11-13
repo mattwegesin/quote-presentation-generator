@@ -271,10 +271,9 @@ def process_monday_cabling_duplicate_async(new_item_id, inn_code, monday_token, 
         else:
             logger.info(f"Background Thread: No subitems found on duplicated Cabling item {new_item_id} after waiting.")
             
-        # Update column values and move group (Status: Contract Sent)
+        # Update column values (Status: Working on it)
         update_query = """
-        mutation ($itemId: ID!, $boardId: ID!, $group: String!, $colVals: JSON!) {
-          move_item_to_group (item_id: $itemId, group_id: $group) { id }
+        mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
           change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
         }
         """
@@ -284,7 +283,7 @@ def process_monday_cabling_duplicate_async(new_item_id, inn_code, monday_token, 
             "color_mm5w8ehb": {"label": "Gathering Info"},
             "status": {"label": "Sales"},
             "color_mm65xpj1": {"label": "Active"},
-            "color_mm6sy6mm": {"label": "Contract Sent"}
+            "color_mm6sy6mm": {"label": "Working on it"}
         }
         if cabling_quote_num and cabling_quote_num != "UNKNOWN":
             vals_dict["text_mm8v74nz"] = str(cabling_quote_num)
@@ -298,7 +297,6 @@ def process_monday_cabling_duplicate_async(new_item_id, inn_code, monday_token, 
             "variables": {
                 "itemId": new_item_id,
                 "boardId": board_id,
-                "group": "topics",
                 "colVals": col_vals
             }
         })
@@ -306,7 +304,7 @@ def process_monday_cabling_duplicate_async(new_item_id, inn_code, monday_token, 
         if "errors" in up_data:
             logger.error(f"Monday Update Duplicated Cabling Item Error: {up_data['errors']}")
         else:
-            logger.info(f"Successfully moved and updated Cabling item {new_item_id}.")
+            logger.info(f"Successfully updated Cabling item {new_item_id}.")
                 
     except Exception as e:
         logger.error(f"Failed in process_monday_cabling_duplicate_async: {e}")
