@@ -1335,7 +1335,7 @@ def process_boldsign_webhook_async(event):
                             current_subitems2 = items_list2[0].get('subitems', []) if items_list2 else []
                             sp_subitem = next((s for s in current_subitems2 if s.get('name') == "Upload Signed GSA to Sharepoint"), None)
                             won_subitem = next((s for s in current_subitems2 if s.get('name') == "Mark Status in Quote Tool as WON"), None)
-                            if sp_subitem or won_subitem:
+                            if sp_subitem and won_subitem:
                                 break
                         except Exception:
                             pass
