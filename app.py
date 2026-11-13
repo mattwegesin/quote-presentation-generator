@@ -467,6 +467,16 @@ def generate():
                 gsa_meeting = float(request.form.get("gsa_meeting", 0))
             except (ValueError, TypeError):
                 gsa_meeting = 0.0
+                
+            try:
+                numeric_room_count = int(room_count)
+            except (ValueError, TypeError):
+                numeric_room_count = 0
+                
+            connect_support = numeric_room_count * 1.50
+            studio_support = 1.00 if gsa_studio == "YES" else 0.00
+            total_studio = numeric_room_count * studio_support
+            total_monthly = connect_support + total_studio + gsa_meeting
 
             from generate_gsa_docx import generate_gsa_docx_to_pdf
             template_path = os.path.join(os.path.dirname(__file__), "GSA_TAGS.docx")
