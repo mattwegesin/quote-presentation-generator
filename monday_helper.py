@@ -280,7 +280,7 @@ def process_monday_cabling_duplicate_async(new_item_id, inn_code, monday_token, 
         vals_dict = {
             "name": inn_code,
             "color_mm5zq7cg": {"label": "CABLING"},
-            "color_mm5w8ehb": {"label": "Gathering Info"},
+            "color_mm5w8ehb": {"label": "Quote Sent to Customer"},
             "status": {"label": "Sales"},
             "color_mm65xpj1": {"label": "Active"},
             "color_mm6sy6mm": {"label": "Working on it"}
