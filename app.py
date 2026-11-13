@@ -247,6 +247,7 @@ def generate():
             if fetched_notes:
                 custom_notes = [note.strip() for note in fetched_notes.split('\n') if note.strip()]
 
+        host_url = request.host_url.rstrip("/")
         import concurrent.futures
         # Limit to 2 workers to prevent Out Of Memory (OOM) crashes in smaller Docker containers
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
@@ -263,7 +264,7 @@ def generate():
         # ---------------------------------------------------------
         pptx_stream.seek(0)
         excel_stream.seek(0)
-        output_stream_client, _, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name, custom_notes=custom_notes)
+        output_stream_client, _, _ = generate_presentation(pptx_stream, excel_stream, property_code=property_code, for_boldsign=False, signer_name=signer_name, custom_notes=custom_notes, cta_link=f"{host_url}/sign/{property_code}")
         output_stream_client.seek(0)
         future_main_client = executor.submit(convert_pptx_to_pdf, output_stream_client)
 
@@ -338,7 +339,7 @@ def generate():
                     cabling_excel_stream.seek(0)
                     cabling_output_client, _, cabling_grand_total = generate_presentation(
                         cabling_pptx_stream, cabling_excel_stream, property_code=property_code, 
-                        for_boldsign=False, signer_name=signer_name, custom_notes=cabling_custom_notes
+                        for_boldsign=False, signer_name=signer_name, custom_notes=cabling_custom_notes, cta_link=f"{host_url}/sign_cabling/{property_code}"
                     )
                     cabling_output_client.seek(0)
                     future_cabling_client = executor.submit(convert_pptx_to_pdf, cabling_output_client)
@@ -490,7 +491,7 @@ def generate():
             # Generate GSA for Client (Has CTA Button)
             future_gsa_client = executor.submit(
                 generate_gsa_docx_to_pdf,
-                template_path, property_code, signer_name, signer_email, hotel_name, address, room_count, gsa_term, gsa_studio, gsa_meeting, gsa_notes, False
+                template_path, property_code, signer_name, signer_email, hotel_name, address, room_count, gsa_term, gsa_studio, gsa_meeting, gsa_notes, False, f"{host_url}/sign_gsa/{property_code}"
             )
 
             # Check for existing GSA quote and create if missing

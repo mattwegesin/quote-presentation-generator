@@ -285,7 +285,7 @@ def create_summary_cards_slide(prs, total_inv, total_mo, logo_data, section_subt
     p.font.color.rgb = red_text
     p.alignment = PP_ALIGN.CENTER
 
-def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None, custom_notes=None, signer_name=None):
+def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=False, legal_terms=None, custom_notes=None, signer_name=None, cta_link=None):
     """Generates two full-width legal disclaimer slides."""
     if custom_notes is None:
         custom_notes = []
@@ -482,10 +482,11 @@ def create_acceptance_slides(prs, logo_data, property_code=None, for_boldsign=Fa
             cta_pic = slide2.shapes.add_picture(btn_image_stream, button_left, button_top, button_width, button_height)
 
             # 2. Apply hyperlink directly to the image object
-            link_url = f"https://quotepresentation.hospitalitytechnologies.com/sign/{property_code}"
-            cta_pic.click_action.hyperlink.address = link_url
+            if not cta_link:
+                cta_link = f"https://quotepresentation.hospitalitytechnologies.com/sign/{property_code}"
+            cta_pic.click_action.hyperlink.address = cta_link
 
-def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False, signer_name=None, custom_notes=None):
+def generate_presentation(pptx_source, excel_source, property_code=None, output_target=None, for_boldsign=False, signer_name=None, custom_notes=None, cta_link=None):
     """
     Generates the presentation deck by extracting quote figures from an Excel workbook
     and injecting formatted slides into a base PowerPoint presentation.
