@@ -825,7 +825,62 @@ def sign_document(property_code):
         
     # Find the most recent matching document
     target_doc = None
-    target_title_prefix = f"Refresh Proposal - {property_code}"
+    target_title_prefix_new = f"Refresh Proposal - {property_code}"
+    target_title_prefix_old = f"Hospitality Technologies Agreement - {property_code}"
+    for doc in docs:
+        if (doc.get("messageTitle", "").startswith(target_title_prefix_new) or doc.get("messageTitle", "").startswith(target_title_prefix_old)) and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
+            target_doc = doc
+            break
+
+    if not target_doc:
+        return "No active document found for signing. It may have expired.", 404
+        
+    document_id = target_doc.get("documentId")
+    try:
+        signer_email = target_doc.get("signerDetails")[0].get("signerEmail")
+    except (TypeError, IndexError, KeyError):
+        return "Signer details could not be parsed from BoldSign.", 500
+    
+    # Get Embedded Sign Link
+    link_url = f"https://api.boldsign.com/v1/document/getEmbeddedSignLink?documentId={document_id}&signerEmail={signer_email}"
+    link_resp = requests.get(link_url, headers=headers)
+    if link_resp.status_code != 200:
+        return f"Failed to generate signing link: {link_resp.text}", 500
+        
+    sign_link = link_resp.json().get("signLink")
+    if sign_link:
+        # Redirect client directly into the signing interface
+        return redirect(sign_link)
+    
+    return "Error generating signature link.", 500
+
+@app.route("/sign_cabling/<property_code>", methods=["GET"])
+def sign_cabling_document(property_code):
+    """Dynamic gateway redirecting to BoldSign embedded signing link specifically for the Cabling Proposal."""
+    property_code = property_code.upper()
+    boldsign_api_key = os.environ.get("BOLDSIGN_API_KEY")
+    if not boldsign_api_key:
+        return "BoldSign integration not configured.", 500
+        
+    headers = {
+        'X-API-KEY': boldsign_api_key,
+        'Accept': 'application/json'
+    }
+    
+    # Search for the document by title
+    search_url = f"https://api.boldsign.com/v1/document/list?searchQuery={property_code}&pageSize=10"
+    resp = requests.get(search_url, headers=headers)
+    if resp.status_code != 200:
+        return "Failed to search BoldSign documents.", 500
+        
+    data = resp.json()
+    docs = data.get("result", [])
+    if not docs:
+        return "Document not found or has expired.", 404
+        
+    # Find the most recent matching document
+    target_doc = None
+    target_title_prefix = f"Cabling Proposal - {property_code}"
     for doc in docs:
         if doc.get("messageTitle", "").startswith(target_title_prefix) and doc.get("status") not in ("Expired", "Completed", "Declined", "Revoked"):
             target_doc = doc

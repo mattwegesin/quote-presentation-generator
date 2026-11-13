@@ -830,6 +830,15 @@
             </div>
             <button type="button" onclick="copyRichText('gsaLinkOutput', this)" style="width: 100%; background: var(--secondary-slate); color: white; border: none; padding: 0.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">Copy Button</button>
           </div>
+
+          <!-- Cabling Link -->
+          <div style="flex: 1; min-width: 200px; display: none;" id="cablingLinkContainer">
+            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--primary-dark);">Cabling Proposal:</p>
+            <div id="cablingLinkOutput" style="padding: 1rem; background: #FFF; border: 1px dashed var(--border-color); border-radius: 8px; text-align: center; margin-bottom: 0.5rem;">
+              <a id="cablingLinkBtn" href="#" style="background-color: #0072CE; color: #ffffff; display: inline-block; padding: 12px 24px; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; text-decoration: none; border-radius: 6px; text-align: center; border: 1px solid #0072CE;">View & E-Sign Cabling</a>
+            </div>
+            <button type="button" onclick="copyRichText('cablingLinkOutput', this)" style="width: 100%; background: var(--secondary-slate); color: white; border: none; padding: 0.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem;">Copy Button</button>
+          </div>
         </div>
       </div>
 
@@ -1550,6 +1559,15 @@
           gsaContainer.style.display = 'block';
         } else {
           gsaContainer.style.display = 'none';
+        }
+
+        const cablingContainer = document.getElementById('cablingLinkContainer');
+        if (document.getElementById('generate_cabling').value === 'true') {
+          const cablingBtn = document.getElementById('cablingLinkBtn');
+          cablingBtn.href = `${baseUrl}/sign_cabling/${cleanPropertyCode}`;
+          cablingContainer.style.display = 'block';
+        } else {
+          cablingContainer.style.display = 'none';
         }
         
         document.getElementById('shareLinksSection').style.display = 'block';
