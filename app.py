@@ -511,7 +511,7 @@ def generate():
                 else:
                     logger.info(f"GSA quote already exists: ID {gsa_quote_id}. Skipping creation.")
                     
-                # Duplicate the Monday item for GSA synchronously to grab ID, then finish async
+                # Check if GSA item already exists in Monday.com for this INN code
                 if monday_item_id and gsa_quote_id:
                     monday_token = os.environ.get("MONDAY_API_TOKEN")
                     if monday_token:
@@ -520,22 +520,76 @@ def generate():
                             "API-Version": "2024-01",
                             "Content-Type": "application/json"
                         }
-                        dup_query = """
-                        mutation ($itemId: ID!) {
-                          duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
-                            id
+                        
+                        search_query = """
+                        query ($boardId: ID!, $val: String!) {
+                          boards (ids: [$boardId]) {
+                            items_page (limit: 50, query_params: {rules: [{column_id: "name", compare_value: [$val]}]}) {
+                              items {
+                                id
+                                name
+                                column_values {
+                                  id
+                                  text
+                                }
+                              }
+                            }
                           }
                         }
                         """
-                        dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
-                        dup_data = dup_resp.json()
-                        if "errors" not in dup_data:
-                            new_gsa_monday_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
-                            logger.info(f"Successfully duplicated item to new GSA item {new_gsa_monday_id}")
+                        search_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": search_query, "variables": {"boardId": "18424851511", "val": property_code}})
+                        search_data = search_resp.json()
+                        
+                        existing_gsa_item_id = None
+                        try:
+                            items = search_data.get("data", {}).get("boards", [{}])[0].get("items_page", {}).get("items", [])
+                            for item in items:
+                                for col in item.get("column_values", []):
+                                    if col.get("id") == "color_mm5zq7cg" and col.get("text") == "GSA ONLY":
+                                        existing_gsa_item_id = item.get("id")
+                                        break
+                                if existing_gsa_item_id:
+                                    break
+                        except Exception as e:
+                            logger.error(f"Error parsing Monday search results for GSA: {e}")
                             
-                            from monday_helper import process_monday_gsa_duplicate_async
-                            import threading
-                            threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token, visible_gsa_quote_num, total_monthly)).start()
+                        if existing_gsa_item_id:
+                            logger.info(f"GSA ONLY item {existing_gsa_item_id} already exists for {property_code}. Updating it.")
+                            new_gsa_monday_id = existing_gsa_item_id
+                            import json
+                            update_query = """
+                            mutation ($itemId: ID!, $boardId: ID!, $colVals: JSON!) {
+                              change_multiple_column_values (item_id: $itemId, board_id: $boardId, column_values: $colVals) { id }
+                            }
+                            """
+                            col_vals = {}
+                            if visible_gsa_quote_num:
+                                col_vals["text_mm8v74nz"] = str(visible_gsa_quote_num)
+                            if total_monthly is not None:
+                                col_vals["numeric_mm8w91ec"] = total_monthly
+                            if col_vals:
+                                requests.post("https://api.monday.com/v2", headers=monday_headers, json={
+                                    "query": update_query,
+                                    "variables": {"itemId": existing_gsa_item_id, "boardId": "18424851511", "colVals": json.dumps(col_vals)}
+                                })
+                        else:
+                            logger.info(f"No GSA ONLY item found for {property_code}. Duplicating item {monday_item_id}.")
+                            dup_query = """
+                            mutation ($itemId: ID!) {
+                              duplicate_item (board_id: 18424851511, item_id: $itemId, with_updates: false) {
+                                id
+                              }
+                            }
+                            """
+                            dup_resp = requests.post("https://api.monday.com/v2", headers=monday_headers, json={"query": dup_query, "variables": {"itemId": monday_item_id}})
+                            dup_data = dup_resp.json()
+                            if "errors" not in dup_data:
+                                new_gsa_monday_id = dup_data.get("data", {}).get("duplicate_item", {}).get("id")
+                                logger.info(f"Successfully duplicated item to new GSA item {new_gsa_monday_id}")
+                                
+                                from monday_helper import process_monday_gsa_duplicate_async
+                                import threading
+                                threading.Thread(target=process_monday_gsa_duplicate_async, args=(new_gsa_monday_id, property_code, monday_token, visible_gsa_quote_num, total_monthly)).start()
             except Exception as e:
                 logger.error(f"Failed during GSA quote automation: {e}")
 
